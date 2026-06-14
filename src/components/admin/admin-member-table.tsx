@@ -13,6 +13,18 @@ import { getStatusLabel, isAdminMember } from "@/lib/member-status";
 import { t } from "@/lib/somali";
 import type { Member } from "@/types";
 
+const EDIT_FIELDS: (keyof Member)[] = [
+  "name",
+  "email",
+  "phone",
+  "monthlyFee",
+  "annualTarget",
+  "joinDate",
+  "endDate",
+  "loginActive",
+  "status",
+];
+
 export function AdminMemberTable() {
   const { members, settings, createMember, editMember, removeMember } = useData();
   const [editMembers, setEditMembers] = useState<Member[]>(members);
@@ -24,28 +36,55 @@ export function AdminMemberTable() {
   }, [members]);
 
   const updateField = (id: string, field: keyof Member, value: string | number | boolean) => {
-    setEditMembers(editMembers.map((m) => (m.id === id ? { ...m, [field]: value } : m)));
+    setEditMembers((prev) => prev.map((m) => (m.id === id ? { ...m, [field]: value } : m)));
   };
 
   const updatePasswordDraft = (id: string, value: string) => {
     setPasswordDrafts((prev) => ({ ...prev, [id]: value }));
   };
 
-  const validateMemberCredentials = (member: Member, draftPassword?: string): string | null => {
+  const validateMemberCredentials = (
+    member: Member,
+    draftPassword?: string,
+    requireActive = false
+  ): string | null => {
     if (isAdminMember(member)) return null;
     const loginId = member.email?.trim() ?? "";
     if (loginId && !isValidLoginId(loginId)) return t.admin.loginIdInvalid;
     if (loginId && isLoginIdTaken(editMembers, loginId, member.id)) return t.admin.loginIdTaken;
-    if (member.loginActive) {
+    if (requireActive || member.loginActive) {
       if (!loginId) return t.admin.loginIdRequired;
-      if (!member.password && !draftPassword?.trim()) return t.admin.passwordRequired;
+      const stored = members.find((m) => m.id === member.id);
+      const hasPassword = Boolean(stored?.password || draftPassword?.trim());
+      if (!hasPassword) return t.admin.passwordRequired;
     }
     return null;
   };
 
+  const buildUpdates = (
+    em: Member,
+    original: Member | undefined,
+    draftPassword?: string
+  ): Partial<Member> => {
+    const updates: Partial<Member> = {};
+    for (const field of EDIT_FIELDS) {
+      if (em[field] !== original?.[field]) {
+        (updates as Record<string, unknown>)[field] = em[field];
+      }
+    }
+    const trimmedEmail = em.email?.trim();
+    if (trimmedEmail !== original?.email?.trim()) {
+      updates.email = trimmedEmail ?? "";
+    }
+    if (draftPassword) {
+      updates.password = hashPassword(draftPassword);
+    }
+    return updates;
+  };
+
   const handleSave = async () => {
     for (const em of editMembers) {
-      const error = validateMemberCredentials(em, passwordDrafts[em.id]);
+      const error = validateMemberCredentials(em, passwordDrafts[em.id], em.loginActive);
       if (error) {
         toast.error(`${em.name}: ${error}`);
         return;
@@ -56,32 +95,7 @@ export function AdminMemberTable() {
     try {
       for (const em of editMembers) {
         const original = members.find((m) => m.id === em.id);
-        const draftPassword = passwordDrafts[em.id]?.trim();
-        const updates: Partial<Member> = {};
-
-        if (original) {
-          const fields: (keyof Member)[] = [
-            "name",
-            "email",
-            "phone",
-            "monthlyFee",
-            "annualTarget",
-            "joinDate",
-            "endDate",
-            "loginActive",
-            "status",
-          ];
-          for (const field of fields) {
-            if (em[field] !== original[field]) {
-              (updates as Record<string, unknown>)[field] = em[field];
-            }
-          }
-        }
-
-        if (draftPassword) {
-          updates.password = hashPassword(draftPassword);
-        }
-
+        const updates = buildUpdates(em, original, passwordDrafts[em.id]?.trim());
         if (Object.keys(updates).length > 0) {
           await editMember(em.id, updates);
         }
@@ -95,31 +109,66 @@ export function AdminMemberTable() {
     }
   };
 
-  const toggleLogin = async (member: Member) => {
-    const newVal = !member.loginActive;
-    if (newVal) {
-      const draftPassword = passwordDrafts[member.id];
-      const error = validateMemberCredentials(member, draftPassword);
+  const toggleLogin = async (em: Member) => {
+    const original = members.find((m) => m.id === em.id);
+    const draftPassword = passwordDrafts[em.id]?.trim();
+    const activating = !em.loginActive;
+
+    if (activating) {
+      const error = validateMemberCredentials(em, draftPassword, true);
       if (error) {
         toast.error(error);
         return;
       }
-      if (draftPassword) {
-        await editMember(member.id, { password: hashPassword(draftPassword), loginActive: true });
+
+      const updates = buildUpdates(em, original, draftPassword);
+      updates.email = em.email?.trim() ?? "";
+      updates.loginActive = true;
+      if (em.status === "removed") updates.status = "active";
+
+      if (!updates.password && !original?.password) {
+        toast.error(t.admin.passwordRequired);
+        return;
+      }
+
+      setSaving(true);
+      try {
+        await editMember(em.id, updates);
+        setEditMembers((prev) =>
+          prev.map((m) =>
+            m.id === em.id
+              ? {
+                  ...m,
+                  ...updates,
+                  password: updates.password ?? m.password,
+                  loginActive: true,
+                }
+              : m
+          )
+        );
         setPasswordDrafts((prev) => {
           const next = { ...prev };
-          delete next[member.id];
+          delete next[em.id];
           return next;
         });
         toast.success(t.admin.loginActivated);
-        return;
+      } catch {
+        toast.error(t.common.error);
+      } finally {
+        setSaving(false);
       }
+      return;
     }
 
-    const updates: Partial<Member> = { loginActive: newVal };
-    if (newVal && member.status === "removed") updates.status = "active";
-    await editMember(member.id, updates);
-    toast.success(newVal ? t.admin.loginActivated : t.admin.loginDeactivated);
+    try {
+      await editMember(em.id, { loginActive: false });
+      setEditMembers((prev) =>
+        prev.map((m) => (m.id === em.id ? { ...m, loginActive: false } : m))
+      );
+      toast.success(t.admin.loginDeactivated);
+    } catch {
+      toast.error(t.common.error);
+    }
   };
 
   const handleAdd = async () => {
@@ -232,9 +281,9 @@ export function AdminMemberTable() {
                     size="sm"
                     variant={m.loginActive ? "default" : "outline"}
                     onClick={() => toggleLogin(m)}
-                    disabled={isAdminMember(m)}
+                    disabled={isAdminMember(m) || saving}
                   >
-                    {m.loginActive ? t.admin.active : t.admin.inactive}
+                    {m.loginActive ? t.admin.active : t.admin.saveAndActivate}
                   </Button>
                 </td>
                 <td className="py-2 px-2">

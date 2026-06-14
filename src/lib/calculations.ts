@@ -117,6 +117,20 @@ export function getCurrentMonthDue(
   return fee * (missed + 1);
 }
 
+export function getNextMonthDue(
+  member: Member,
+  payments: Payment[],
+  settings?: AppSettings,
+  date: Date = new Date()
+): number {
+  const fee = getMemberMonthlyFee(member, settings);
+  const escalation = settings?.lateFeeEscalation ?? true;
+  if (!escalation || isCurrentMonthPaid(payments, member.id, date)) return fee;
+
+  const missedBefore = getConsecutiveMissedBefore(member, payments, settings, date);
+  return fee * (missedBefore + 2);
+}
+
 export function calculateMemberDebt(
   member: Member,
   payments: Payment[],
@@ -182,6 +196,7 @@ export function calculateMemberStats(
     monthsPaid: memberPayments.length,
     isCurrentMonthPaid: isCurrentMonthPaid(payments, member.id, date),
     currentMonthDue: getCurrentMonthDue(member, payments, settings, date),
+    nextMonthDue: getNextMonthDue(member, payments, settings, date),
     consecutiveMissed,
     ownershipValue: totalPaid,
     memberMonthlyFee,

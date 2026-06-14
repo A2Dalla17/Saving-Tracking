@@ -47,6 +47,9 @@ async function loginWithFirebase(identifier: string, password: string) {
   });
 
   const data = await res.json();
+  if (res.status === 503) {
+    return { success: false as const, fallbackLocal: true as const };
+  }
   if (!res.ok) {
     return { success: false as const, error: data.error ?? "Login failed" };
   }
@@ -58,6 +61,33 @@ async function loginWithFirebase(identifier: string, password: string) {
 
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
   return { success: true as const, user: data.user as AuthUser };
+}
+
+function loginLocally(identifier: string, password: string, members: Member[]) {
+  const member = findMemberByIdentifier(members, identifier);
+  if (!member) return { success: false as const, error: "Login ID lama helin" };
+  if (!member.loginActive) {
+    return { success: false as const, error: "Login-kaaga weli ma active gashan. La xiriir admin-ka." };
+  }
+  if (member.status === "removed") {
+    return { success: false as const, error: "Waxaa lagaa saaray kooxda. La xiriir admin-ka." };
+  }
+  if (!member.password || !verifyPassword(password, member.password)) {
+    return { success: false as const, error: "Password-ka waa khaldan yahay" };
+  }
+
+  const authUser: AuthUser = {
+    memberId: member.id,
+    name: member.name,
+    email: member.email,
+    phone: member.phone,
+    isAdmin:
+      isAdminEmail(member.email ?? "") ||
+      member.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase(),
+  };
+
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
+  return { success: true as const, user: authUser };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -76,38 +106,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isFirebaseConfigured()) {
         try {
           const result = await loginWithFirebase(identifier, password);
-          if (!result.success) return result;
-          setUser(result.user);
-          return { success: true };
+          if (result.success) {
+            setUser(result.user);
+            return { success: true };
+          }
+          if ("fallbackLocal" in result && result.fallbackLocal) {
+            const local = loginLocally(identifier, password, members);
+            if (!local.success) return local;
+            setUser(local.user);
+            return { success: true };
+          }
+          return { success: false, error: result.error };
         } catch {
-          return { success: false, error: "Server login failed. Hubi Firebase config." };
+          const local = loginLocally(identifier, password, members);
+          if (!local.success) return local;
+          setUser(local.user);
+          return { success: true };
         }
       }
 
-      const member = findMemberByIdentifier(members, identifier);
-      if (!member) return { success: false, error: "Login ID lama helin" };
-      if (!member.loginActive) {
-        return { success: false, error: "Login-kaaga weli ma active gashan. La xiriir admin-ka." };
-      }
-      if (member.status === "removed") {
-        return { success: false, error: "Waxaa lagaa saaray kooxda. La xiriir admin-ka." };
-      }
-      if (!member.password || !verifyPassword(password, member.password)) {
-        return { success: false, error: "Password-ka waa khaldan yahay" };
-      }
-
-      const authUser: AuthUser = {
-        memberId: member.id,
-        name: member.name,
-        email: member.email,
-        phone: member.phone,
-        isAdmin:
-          isAdminEmail(member.email ?? "") ||
-          member.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase(),
-      };
-
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
-      setUser(authUser);
+      const local = loginLocally(identifier, password, members);
+      if (!local.success) return local;
+      setUser(local.user);
       return { success: true };
     },
     []

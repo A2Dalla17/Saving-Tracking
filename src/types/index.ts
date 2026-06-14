@@ -78,6 +78,7 @@ export interface MemberStats {
   monthsPaid: number;
   isCurrentMonthPaid: boolean;
   currentMonthDue: number;
+  nextMonthDue: number;
   consecutiveMissed: number;
   ownershipValue: number;
   memberMonthlyFee: number;
