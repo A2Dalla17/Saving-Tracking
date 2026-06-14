@@ -2,9 +2,8 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: path.join(__dirname),
-  },
+  // Fixes Vercel/local builds when parent folders have other package-lock.json files
+  outputFileTracingRoot: path.join(__dirname),
   serverExternalPackages: ["firebase-admin"],
   headers: async () => [
     {
@@ -13,6 +12,10 @@ const nextConfig: NextConfig = {
         { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
         { key: "Service-Worker-Allowed", value: "/" },
       ],
+    },
+    {
+      source: "/manifest.json",
+      headers: [{ key: "Content-Type", value: "application/manifest+json" }],
     },
   ],
 };
