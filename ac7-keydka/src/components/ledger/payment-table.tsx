@@ -12,6 +12,7 @@ import {
   getMonthName,
   getCurrentMonthKey,
   formatMonthKey,
+  formatCurrency,
 } from "@/lib/calculations";
 import { getPayingMembers, filterPayingPayments } from "@/lib/member-status";
 import { t } from "@/lib/somali";
@@ -118,10 +119,31 @@ export function PaymentTable() {
                     )}
                   </td>
                   <td className="py-4 px-4">
-                    <CurrencyDisplay
-                      amount={ms.isCurrentMonthPaid ? ms.currentMonthDue : ms.currentMonthDue}
-                      size="sm"
-                    />
+                    {ms.isCurrentMonthPaid ? (
+                      <CurrencyDisplay amount={ms.currentMonthDue} size="sm" />
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground min-w-[52px]">{t.ledger.thisMonth}:</span>
+                          <CurrencyDisplay amount={ms.memberMonthlyFee} size="sm" />
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground min-w-[52px]">{t.ledger.nextMonth}:</span>
+                          <CurrencyDisplay amount={ms.nextMonthDue} size="sm" className="text-destructive" />
+                        </div>
+                        {settings.lateFeeEscalation && ms.consecutiveMissed === 0 && (
+                          <p className="text-xs text-destructive font-medium">
+                            {formatCurrency(ms.memberMonthlyFee)} + {formatCurrency(ms.memberMonthlyFee)} = {formatCurrency(ms.nextMonthDue)}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">{t.ledger.feeDoubleHint}</p>
+                        {ms.consecutiveMissed > 0 && (
+                          <p className="text-xs text-destructive">
+                            {t.ledger.escalated} — {t.ledger.thisMonth}: {formatCurrency(ms.currentMonthDue)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="py-4 px-4 text-right">
                     {ms.isCurrentMonthPaid ? (

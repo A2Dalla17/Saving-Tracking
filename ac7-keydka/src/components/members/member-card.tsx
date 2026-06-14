@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { getStatusLabel } from "@/lib/member-status";
+import { formatCurrency } from "@/lib/calculations";
 import { t } from "@/lib/somali";
 import type { MemberStats } from "@/types";
 
@@ -18,6 +19,7 @@ export function MemberCard({ stats }: MemberCardProps) {
   const {
     member, totalPaid, debt, sharePercent, isCurrentMonthPaid,
     monthsPaid, memberMonthlyFee, annualTarget, annualProgress, consecutiveMissed,
+    currentMonthDue,
   } = stats;
 
   const statusColors = {
@@ -75,6 +77,24 @@ export function MemberCard({ stats }: MemberCardProps) {
               <CurrencyDisplay amount={debt} size="sm" className={debt > 0 ? "text-destructive" : "text-success"} />
             </div>
           </div>
+
+          {!isCurrentMonthPaid && consecutiveMissed === 0 && (
+            <div className="mb-4 p-3 rounded-xl bg-destructive/5 border border-destructive/20 text-xs">
+              <p className="text-muted-foreground">{t.ledger.thisMonth}: <CurrencyDisplay amount={memberMonthlyFee} size="sm" /></p>
+              <p className="text-destructive font-medium mt-1">
+                {t.ledger.nextMonth}: <CurrencyDisplay amount={memberMonthlyFee * 2} size="sm" />
+                <span className="text-muted-foreground font-normal ml-1">
+                  ({formatCurrency(memberMonthlyFee)} + {formatCurrency(memberMonthlyFee)})
+                </span>
+              </p>
+            </div>
+          )}
+
+          {!isCurrentMonthPaid && consecutiveMissed > 0 && (
+            <div className="mb-4 p-3 rounded-xl bg-destructive/5 border border-destructive/20 text-xs text-destructive">
+              {t.ledger.escalated} — {t.ledger.thisMonth}: <CurrencyDisplay amount={currentMonthDue} size="sm" />
+            </div>
+          )}
 
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-muted-foreground">
