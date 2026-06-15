@@ -225,8 +225,8 @@ export const t = {
     startDate: "Taariikhda Bilowga",
     adminPin: "PIN-ka Maamulka",
     adminEmail: "Gmail-ka Maamulka",
-    firebaseStatus: "Xaaladda System-ka",
-    connected: "Ku xiran (Firebase)",
+    systemStatus: "Xaaladda System-ka",
+    connected: "Ku xiran (Supabase)",
     demo: "Habka Demo (Local)",
   },
   common: {

@@ -1,26 +1,26 @@
 import { NextResponse } from "next/server";
-import { isFirebaseConfigured } from "@/lib/firebase";
-import { isAdminSdkConfigured } from "@/lib/firebase-admin";
-import { isFirestoreEmpty } from "@/lib/firestore-seed";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { isSupabaseAdminConfigured } from "@/lib/supabase-admin";
+import { isSupabaseEmpty } from "@/lib/supabase-seed";
 
 export async function GET() {
-  const clientFirebase = isFirebaseConfigured();
-  const adminSdk = isAdminSdkConfigured();
-  let firestoreEmpty: boolean | null = null;
+  const clientSupabase = isSupabaseConfigured();
+  const adminSupabase = isSupabaseAdminConfigured();
+  let databaseEmpty: boolean | null = null;
 
-  if (adminSdk) {
+  if (adminSupabase) {
     try {
-      firestoreEmpty = await isFirestoreEmpty();
+      databaseEmpty = await isSupabaseEmpty();
     } catch {
-      firestoreEmpty = null;
+      databaseEmpty = null;
     }
   }
 
   return NextResponse.json({
-    mode: clientFirebase && adminSdk ? "firebase" : "demo",
-    clientFirebase,
-    adminSdk,
-    firestoreEmpty,
-    ready: clientFirebase && adminSdk && firestoreEmpty === false,
+    mode: clientSupabase && adminSupabase ? "supabase" : "demo",
+    clientSupabase,
+    adminSupabase,
+    databaseEmpty,
+    ready: clientSupabase && adminSupabase && databaseEmpty === false,
   });
 }

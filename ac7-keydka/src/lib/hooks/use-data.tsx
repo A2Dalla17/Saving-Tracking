@@ -28,8 +28,8 @@ import {
   addChatMessage,
   deleteChatMessage,
   seedDefaultMembers,
-} from "@/lib/firestore";
-import { isFirebaseConfigured } from "@/lib/firebase";
+} from "@/lib/data-store";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { getConsecutiveMissedBefore } from "@/lib/calculations";
 import { resolveMemberStatus, shouldDeactivateLogin, getPayingMembers } from "@/lib/member-status";
@@ -68,7 +68,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [bin, setBin] = useState<ArchivedMemberRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const syncingRef = useRef(false);
-  const firebaseMode = isFirebaseConfigured();
+  const cloudMode = isSupabaseConfigured();
 
   const syncMemberStatuses = useCallback(
     async (memberList: Member[], paymentList: Payment[], appSettings: AppSettings) => {
@@ -138,7 +138,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     if (authLoading) return;
 
-    if (firebaseMode && !user) {
+    if (cloudMode && !user) {
       seedDefaultMembers().finally(() => {
         clearData();
         markAllLoaded();
@@ -195,7 +195,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       unsubChats?.();
       unsubBin?.();
     };
-  }, [user, authLoading, firebaseMode]);
+  }, [user, authLoading, cloudMode]);
 
   useEffect(() => {
     if (!loading && members.length > 0 && user) {

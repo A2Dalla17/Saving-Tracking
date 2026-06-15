@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { importLocalDataToFirestore, type LocalCloudPayload } from "@/lib/firestore-seed";
+import { importLocalDataToSupabase, type LocalCloudPayload } from "@/lib/supabase-seed";
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as LocalCloudPayload;
-    const result = await importLocalDataToFirestore(body);
+    const result = await importLocalDataToSupabase(body);
 
-    if (result.reason === "admin-sdk-missing") {
+    if (result.reason === "admin-missing") {
       return NextResponse.json(
-        { error: "FIREBASE_SERVICE_ACCOUNT_JSON ma jiro Vercel-ka" },
+        { error: "SUPABASE_SERVICE_ROLE_KEY ma jiro Vercel-ka" },
         { status: 503 }
       );
     }
