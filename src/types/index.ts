@@ -27,6 +27,18 @@ export interface Payment {
   note?: string;
 }
 
+export interface Savings {
+  id: string;
+  memberId: string;
+  memberName: string;
+  amount: number;
+  month: string;
+  year: number;
+  paidAt: string;
+  note?: string;
+  createdAt?: string;
+}
+
 export interface AppSettings {
   monthlyFee: number;
   groupGoal: number;

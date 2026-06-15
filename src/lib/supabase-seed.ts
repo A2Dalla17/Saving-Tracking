@@ -113,6 +113,24 @@ export async function importLocalDataToSupabase(
       .from("payments")
       .insert(payload.payments.map((p) => paymentToRow({ ...p, id: p.id || generateId() })));
     if (error) throw error;
+
+    const { error: savingsError } = await supabase.from("savings").insert(
+      payload.payments.map((p) => {
+        const payment = { ...p, id: p.id || generateId() };
+        return {
+          id: payment.id,
+          member_id: payment.memberId,
+          member_name: payment.memberName,
+          amount: payment.amount,
+          month: payment.month,
+          year: payment.year,
+          paid_at: payment.paidAt,
+          note: payment.note ?? "",
+          created_at: payment.paidAt,
+        };
+      })
+    );
+    if (savingsError) throw savingsError;
   }
 
   if (payload.settings) {

@@ -18,9 +18,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
             position="top-center"
             toastOptions={{
               style: {
-                background: "#690957",
+                background: "#030337",
                 color: "#ffffff",
-                border: "1px solid #F4B63F",
+                border: "1px solid #2563eb",
                 borderRadius: "12px",
               },
             }}

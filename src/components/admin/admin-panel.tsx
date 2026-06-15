@@ -55,7 +55,7 @@ export function AdminPanel() {
 
       <TabsContent value="settings" className="space-y-4">
         <Card>
-          <CardHeader><CardTitle className="text-brand">{t.settings.groupInfo}</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t.settings.groupInfo}</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>{t.admin.monthlyFee}</Label>
@@ -73,7 +73,7 @@ export function AdminPanel() {
               <Label>{t.settings.adminPin}</Label>
               <Input type="password" maxLength={6} value={localSettings.adminPin} onChange={(e) => setLocalSettings({ ...localSettings, adminPin: e.target.value })} />
             </div>
-            <div className="md:col-span-2 text-sm text-muted-foreground">
+            <div className="md:col-span-2 text-sm text-slate-500">
               System: {getDataMode() === "supabase" ? t.settings.connected : t.settings.demo}
             </div>
           </CardContent>

@@ -22,35 +22,35 @@ export function SavingsChart({ data }: SavingsChartProps) {
   return (
     <Card className="animate-fade-in-up">
       <CardHeader>
-        <CardTitle className="text-brand">{t.dashboard.savingsGrowth}</CardTitle>
+        <CardTitle>{t.dashboard.savingsGrowth}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] w-full">
+        <div className="h-[280px] sm:h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#690957" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#690957" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8D8ED" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 12, fill: "#6B5B6E" }}
-                axisLine={{ stroke: "#E8D8ED" }}
+                tick={{ fontSize: 12, fill: "#64748b" }}
+                axisLine={{ stroke: "#cbd5e1" }}
               />
               <YAxis
-                tick={{ fontSize: 12, fill: "#6B5B6E" }}
-                axisLine={{ stroke: "#E8D8ED" }}
+                tick={{ fontSize: 12, fill: "#64748b" }}
+                axisLine={{ stroke: "#cbd5e1" }}
                 tickFormatter={(v) => `$${v}`}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#690957",
-                  border: "none",
+                  backgroundColor: "#f7f2ea",
+                  border: "1px solid #e0d6c8",
                   borderRadius: "12px",
-                  color: "#fff",
+                  color: "#1e293b",
                   fontFamily: "monospace",
                 }}
                 formatter={(value) => [formatCurrency(Number(value)), "Kaydka"]}
@@ -58,7 +58,7 @@ export function SavingsChart({ data }: SavingsChartProps) {
               <Area
                 type="monotone"
                 dataKey="savings"
-                stroke="#690957"
+                stroke="#2563eb"
                 strokeWidth={3}
                 fill="url(#savingsGradient)"
               />

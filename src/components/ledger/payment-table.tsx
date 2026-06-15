@@ -68,7 +68,7 @@ export function PaymentTable() {
   if (payingMembers.length === 0) {
     return (
       <Card>
-        <CardContent className="p-12 text-center text-muted-foreground">
+        <CardContent className="p-12 text-center text-slate-500">
           {t.members.noMembers}
         </CardContent>
       </Card>
@@ -80,7 +80,7 @@ export function PaymentTable() {
   return (
     <Card className="animate-fade-in-up">
       <CardHeader>
-        <CardTitle className="text-brand">
+        <CardTitle>
           {currentMonth} — {t.ledger.month}
         </CardTitle>
         {allPaid && <p className="text-sm text-success font-medium">{t.ledger.allPaid}</p>}
@@ -89,18 +89,18 @@ export function PaymentTable() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border">
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{t.ledger.member}</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{t.ledger.status}</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{t.ledger.amount}</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">{t.ledger.action}</th>
+              <tr className="border-b border-slate-200">
+                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">{t.ledger.member}</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">{t.ledger.status}</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">{t.ledger.amount}</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">{t.ledger.action}</th>
               </tr>
             </thead>
             <tbody>
               {memberStatsList.map((ms) => (
-                <tr key={ms.member.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                <tr key={ms.member.id} className="border-b border-border hover:bg-muted transition-colors">
                   <td className="py-4 px-4">
-                    <span className="font-medium">{ms.member.name}</span>
+                    <span className="font-medium text-slate-900">{ms.member.name}</span>
                     {ms.consecutiveMissed > 0 && !ms.isCurrentMonthPaid && (
                       <span className="block text-xs text-destructive">{t.ledger.escalated}</span>
                     )}

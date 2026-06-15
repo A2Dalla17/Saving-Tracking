@@ -14,7 +14,7 @@ export default function MembersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-muted-foreground">{t.common.loading}</p>
+        <p className="text-white/80">{t.common.loading}</p>
       </div>
     );
   }
@@ -32,10 +32,10 @@ export default function MembersPage() {
 
       {teamMembers.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-[40vh] text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mb-4">
-            <Users className="h-8 w-8 text-muted-foreground" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 mb-4">
+            <Users className="h-8 w-8 text-accent" />
           </div>
-          <p className="text-muted-foreground">{t.members.noMembers}</p>
+          <p className="text-white/70">{t.members.noMembers}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">

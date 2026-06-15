@@ -15,24 +15,24 @@ const cards = [
     key: "totalSavings" as const,
     label: t.dashboard.totalSavings,
     icon: PiggyBank,
-    color: "text-brand",
-    bg: "bg-brand/10",
+    color: "text-accent",
+    bg: "bg-muted",
     getValue: (s: GroupStats) => s.totalSavings,
   },
   {
     key: "totalDebt" as const,
     label: t.dashboard.totalDebt,
     icon: AlertTriangle,
-    color: "text-destructive",
-    bg: "bg-destructive/10",
+    color: "text-red-600",
+    bg: "bg-red-50",
     getValue: (s: GroupStats) => s.totalDebt,
   },
   {
     key: "members" as const,
     label: t.dashboard.members,
     icon: Users,
-    color: "text-gold",
-    bg: "bg-gold/20",
+    color: "text-brand",
+    bg: "bg-muted",
     getValue: (s: GroupStats) => s.memberCount,
     isCount: true,
   },
@@ -40,8 +40,8 @@ const cards = [
     key: "goal" as const,
     label: t.dashboard.groupGoal,
     icon: Target,
-    color: "text-brand",
-    bg: "bg-brand/10",
+    color: "text-accent",
+    bg: "bg-muted",
     getValue: (s: GroupStats) => s.groupGoal,
     isGoal: true,
   },
@@ -49,32 +49,32 @@ const cards = [
 
 export function StatsCards({ stats }: StatsCardsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
       {cards.map((card, i) => {
         const Icon = card.icon;
         const value = card.getValue(stats);
         return (
           <Card
             key={card.key}
-            className="animate-fade-in-up overflow-hidden border-brand/5 hover:border-brand/20 transition-colors"
+            className="animate-fade-in-up overflow-hidden transition-colors"
             style={{ animationDelay: `${i * 100}ms` }}
           >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground font-medium">{card.label}</p>
+            <CardContent className="p-5 sm:p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-2 min-w-0">
+                  <p className="text-sm text-slate-500 font-medium">{card.label}</p>
                   {card.isCount ? (
-                    <p className="font-mono-currency text-3xl font-bold text-brand">{value}</p>
+                    <p className="font-mono-currency text-2xl sm:text-3xl font-bold text-slate-900">{value}</p>
                   ) : card.isGoal ? (
                     <div>
-                      <CurrencyDisplay amount={value as number} size="lg" className="text-brand" />
-                      <p className="text-xs text-muted-foreground mt-1">{stats.goalProgress.toFixed(0)}% gaaray</p>
+                      <CurrencyDisplay amount={value as number} size="lg" className="text-slate-900" />
+                      <p className="text-xs text-slate-500 mt-1">{stats.goalProgress.toFixed(0)}% gaaray</p>
                     </div>
                   ) : (
-                    <CurrencyDisplay amount={value as number} size="lg" className="text-brand" />
+                    <CurrencyDisplay amount={value as number} size="lg" className="text-slate-900" />
                   )}
                 </div>
-                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${card.bg}`}>
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${card.bg}`}>
                   <Icon className={`h-6 w-6 ${card.color}`} />
                 </div>
               </div>

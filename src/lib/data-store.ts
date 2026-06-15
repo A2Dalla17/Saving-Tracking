@@ -14,6 +14,9 @@ import {
   rowToChat,
   chatToRow,
   rowToBin,
+  rowToSavings,
+  savingsToRow,
+  paymentToSavings,
 } from "./supabase-mappers";
 import {
   DEFAULT_SETTINGS,
@@ -24,7 +27,7 @@ import {
 } from "./constants";
 import { hashPassword } from "./auth";
 import { generateId } from "./utils";
-import type { Member, Payment, AppSettings, Announcement, ChatMessage, ArchivedMemberRecord } from "@/types";
+import type { Member, Payment, AppSettings, Announcement, ChatMessage, ArchivedMemberRecord, Savings } from "@/types";
 
 const STORAGE_KEYS = {
   MEMBERS: "ac7_members",
@@ -103,6 +106,64 @@ async function fetchAllChats(): Promise<ChatMessage[]> {
   const { data, error } = await supabase.from("chats").select("*").order("sent_at", { ascending: true });
   if (error) throw error;
   return (data ?? []).map((row) => rowToChat(row));
+}
+
+async function fetchAllSavings(): Promise<Savings[]> {
+  const supabase = getSupabase();
+  if (!supabase) return getLocalPayments().map((p) => paymentToSavings(p));
+  const { data, error } = await supabase
+    .from("savings")
+    .select("*")
+    .order("paid_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => rowToSavings(row));
+}
+
+async function syncSavingsFromPayments(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  try {
+    const { count, error: countError } = await supabase
+      .from("savings")
+      .select("*", { count: "exact", head: true });
+    if (countError) {
+      console.error("SUPABASE savings count error:", countError);
+      return;
+    }
+    if ((count ?? 0) > 0) return;
+
+    const payments = await fetchAllPayments();
+    if (payments.length === 0) return;
+
+    const { error } = await supabase
+      .from("savings")
+      .insert(payments.map((p) => savingsToRow(paymentToSavings(p))));
+    if (error) console.error("SUPABASE savings sync error:", error);
+  } catch (err) {
+    console.error("SUPABASE savings sync failed:", err);
+  }
+}
+
+async function upsertSavingsRecord(payment: Payment): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase.from("savings").upsert(savingsToRow(paymentToSavings(payment)));
+  if (error) console.error("SUPABASE savings upsert error:", error);
+}
+
+async function removeSavingsRecord(paymentId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase.from("savings").delete().eq("id", paymentId);
+  if (error) console.error("SUPABASE savings delete error:", error);
+}
+
+async function removeSavingsForMember(memberId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase.from("savings").delete().eq("member_id", memberId);
+  if (error) console.error("SUPABASE savings member delete error:", error);
 }
 
 async function fetchAllBin(): Promise<ArchivedMemberRecord[]> {
@@ -283,9 +344,18 @@ export async function ensureCloudSetup(): Promise<void> {
   if (typeof window === "undefined" || !isSupabaseConfigured()) return;
 
   try {
-    await fetch("/api/setup/seed", { method: "POST" });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    await fetch("/api/setup/seed", { method: "POST", signal: controller.signal });
+    clearTimeout(timer);
   } catch {
     // seed is best-effort before login
+  }
+
+  try {
+    await syncSavingsFromPayments();
+  } catch {
+    // savings sync must not block app load
   }
 
   if (localStorage.getItem(STORAGE_KEYS.CLOUD_MIGRATED)) return;
@@ -382,7 +452,12 @@ export function subscribeMembers(callback: (members: Member[]) => void): Unsubsc
   }
 
   const reload = () => {
-    fetchAllMembers().then(callback).catch(console.error);
+    fetchAllMembers()
+      .then(callback)
+      .catch((err) => {
+        console.error("SUPABASE members fetch error:", err);
+        callback([]);
+      });
   };
   return subscribeRealtime("members", reload);
 }
@@ -397,9 +472,35 @@ export function subscribePayments(callback: (payments: Payment[]) => void): Unsu
   }
 
   const reload = () => {
-    fetchAllPayments().then(callback).catch(console.error);
+    fetchAllPayments()
+      .then(callback)
+      .catch((err) => {
+        console.error("SUPABASE payments fetch error:", err);
+        callback([]);
+      });
   };
   return subscribeRealtime("payments", reload);
+}
+
+export function subscribeSavings(callback: (items: Savings[]) => void): Unsubscribe {
+  const supabase = getSupabase();
+  if (!supabase) {
+    const load = () => callback(getLocalPayments().map((p) => paymentToSavings(p)));
+    load();
+    const handler = () => load();
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }
+
+  const reload = () => {
+    fetchAllSavings()
+      .then(callback)
+      .catch((err) => {
+        console.error("SUPABASE savings fetch error:", err);
+        callback([]);
+      });
+  };
+  return subscribeRealtime("savings", reload);
 }
 
 export function subscribeSettings(callback: (settings: AppSettings) => void): Unsubscribe {
@@ -412,7 +513,12 @@ export function subscribeSettings(callback: (settings: AppSettings) => void): Un
   }
 
   const reload = () => {
-    fetchSettingsRow().then(callback).catch(console.error);
+    fetchSettingsRow()
+      .then(callback)
+      .catch((err) => {
+        console.error("SUPABASE settings fetch error:", err);
+        callback(DEFAULT_SETTINGS);
+      });
   };
   return subscribeRealtime("app_settings", reload);
 }
@@ -431,7 +537,12 @@ export function subscribeAnnouncements(callback: (items: Announcement[]) => void
   }
 
   const reload = () => {
-    fetchAnnouncements().then(callback).catch(console.error);
+    fetchAnnouncements()
+      .then(callback)
+      .catch((err) => {
+        console.error("SUPABASE announcements fetch error:", err);
+        callback([]);
+      });
   };
   return subscribeRealtime("announcements", reload);
 }
@@ -446,7 +557,12 @@ export function subscribeChats(callback: (messages: ChatMessage[]) => void): Uns
   }
 
   const reload = () => {
-    fetchAllChats().then(callback).catch(console.error);
+    fetchAllChats()
+      .then(callback)
+      .catch((err) => {
+        console.error("SUPABASE chats fetch error:", err);
+        callback([]);
+      });
   };
   return subscribeRealtime("chats", reload);
 }
@@ -574,6 +690,7 @@ export async function archiveMemberToBin(
   await supabase.from("members").delete().eq("id", memberId);
   if (memberPayments.length) {
     await supabase.from("payments").delete().in("id", memberPayments.map((p) => p.id));
+    await removeSavingsForMember(memberId);
   }
   if (memberChats.length) {
     await supabase.from("chats").delete().in("id", memberChats.map((c) => c.id));
@@ -615,6 +732,7 @@ export async function restoreMemberFromBin(archiveId: string): Promise<void> {
   await supabase.from("members").insert(memberToRow(restored));
   if (data.payments.length) {
     await supabase.from("payments").insert(data.payments.map((p) => paymentToRow(p)));
+    await supabase.from("savings").insert(data.payments.map((p) => savingsToRow(paymentToSavings(p))));
   }
   if (data.chats.length) {
     await supabase.from("chats").insert(data.chats.map((c) => chatToRow(c)));
@@ -632,7 +750,12 @@ export function subscribeBin(callback: (records: ArchivedMemberRecord[]) => void
   }
 
   const reload = () => {
-    fetchAllBin().then(callback).catch(console.error);
+    fetchAllBin()
+      .then(callback)
+      .catch((err) => {
+        console.error("SUPABASE bin fetch error:", err);
+        callback([]);
+      });
   };
   return subscribeRealtime("bin", reload);
 }
@@ -660,6 +783,7 @@ export async function addPayment(payment: Omit<Payment, "id">): Promise<Payment>
   }
   const { error } = await supabase.from("payments").insert(paymentToRow({ ...newPayment, note: newPayment.note ?? "" }));
   if (error) throw error;
+  await upsertSavingsRecord(newPayment);
   return newPayment;
 }
 
@@ -672,6 +796,7 @@ export async function deletePayment(paymentId: string): Promise<void> {
   }
   const { error } = await supabase.from("payments").delete().eq("id", paymentId);
   if (error) throw error;
+  await removeSavingsRecord(paymentId);
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {

@@ -33,7 +33,7 @@ export function AdminAnnouncements() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-brand flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Megaphone className="h-5 w-5" />
           {t.announcements.title}
         </CardTitle>
@@ -42,7 +42,7 @@ export function AdminAnnouncements() {
         <div className="space-y-2">
           <Label>{t.announcements.message}</Label>
           <textarea
-            className="flex w-full rounded-xl border border-border bg-white px-4 py-3 text-sm min-h-[100px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex w-full rounded-xl border border-border bg-card text-slate-900 px-4 py-3 text-sm min-h-[100px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent placeholder:text-slate-400"
             placeholder={t.announcements.placeholder}
             value={message}
             onChange={(e) => setMessage(e.target.value)}

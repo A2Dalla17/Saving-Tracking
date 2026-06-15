@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   Member,
   Payment,
+  Savings,
 } from "@/types";
 
 export function rowToMember(row: Record<string, unknown>): Member {
@@ -68,6 +69,50 @@ export function paymentToRow(payment: Payment) {
     year: payment.year,
     paid_at: payment.paidAt,
     note: payment.note ?? "",
+  };
+}
+
+export function rowToSavings(row: Record<string, unknown>): Savings {
+  return {
+    id: row.id as string,
+    memberId: row.member_id as string,
+    memberName: row.member_name as string,
+    amount: Number(row.amount),
+    month: row.month as string,
+    year: Number(row.year),
+    paidAt: new Date(row.paid_at as string).toISOString(),
+    note: (row.note as string) || undefined,
+    createdAt: row.created_at
+      ? new Date(row.created_at as string).toISOString()
+      : undefined,
+  };
+}
+
+export function savingsToRow(savings: Savings) {
+  return {
+    id: savings.id,
+    member_id: savings.memberId,
+    member_name: savings.memberName,
+    amount: savings.amount,
+    month: savings.month,
+    year: savings.year,
+    paid_at: savings.paidAt,
+    note: savings.note ?? "",
+    created_at: savings.createdAt ?? savings.paidAt,
+  };
+}
+
+export function paymentToSavings(payment: Payment): Savings {
+  return {
+    id: payment.id,
+    memberId: payment.memberId,
+    memberName: payment.memberName,
+    amount: payment.amount,
+    month: payment.month,
+    year: payment.year,
+    paidAt: payment.paidAt,
+    note: payment.note,
+    createdAt: payment.paidAt,
   };
 }
 

@@ -33,7 +33,7 @@ export function MemberAvatar({ member, size = "md", className }: MemberAvatarPro
     <div
       className={cn(
         sizeClass,
-        "brand-gradient flex items-center justify-center text-white font-bold shrink-0",
+        "brand-gradient flex items-center justify-center text-white font-bold shrink-0 bg-brand",
         className
       )}
     >

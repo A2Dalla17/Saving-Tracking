@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Sidebar, MobileNav, LogoCorner } from "@/components/layout/sidebar";
@@ -11,47 +11,59 @@ import { useData } from "@/lib/hooks/use-data";
 import { InstallAppBanner } from "@/components/shared/install-app-banner";
 import { t } from "@/lib/somali";
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+      <p className="text-foreground/80">{t.common.loading}</p>
+    </div>
+  );
+}
+
+function LoginShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4 sm:p-6 safe-top pb-safe">
+      <div className="fixed top-6 right-6">
+        <div className="relative h-20 w-20">
+          <Image src="/logo.png" alt="AC7" fill className="object-contain" />
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { loading: dataLoading } = useData();
+  const [mounted, setMounted] = useState(false);
 
   const isLoginPage = pathname === "/login";
 
   useEffect(() => {
-    if (!authLoading && !dataLoading && !user && !isLoginPage) {
-      router.replace("/login");
-    }
-  }, [user, authLoading, dataLoading, isLoginPage, router]);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || authLoading || user || isLoginPage) return;
+    router.replace("/login");
+  }, [mounted, user, authLoading, isLoginPage, router]);
 
   if (isLoginPage) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4 safe-top pb-safe">
-        <div className="fixed top-6 right-6">
-          <div className="relative h-20 w-20">
-            <Image src="/logo.png" alt="AC7" fill className="object-contain" />
-          </div>
-        </div>
-        {children}
-      </div>
-    );
+    return <LoginShell>{children}</LoginShell>;
   }
 
-  if (authLoading || dataLoading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground">{t.common.loading}</p>
-      </div>
-    );
+  if (!mounted || authLoading || !user || dataLoading) {
+    return <LoadingScreen />;
   }
 
   return (
-    <div className="min-h-screen bg-background safe-top">
+    <div className="min-h-screen bg-background text-foreground safe-top">
       <Sidebar />
       <LogoCorner />
       <main className="lg:pl-72">
-        <div className="px-4 sm:px-6 lg:px-8 py-4 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-8">
+        <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-8 max-w-7xl lg:max-w-none mx-auto lg:mx-0">
           <InstallAppBanner />
           <AnnouncementBanner />
           <MonthlyReminder />

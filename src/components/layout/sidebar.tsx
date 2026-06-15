@@ -42,14 +42,14 @@ export function Sidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 border-r border-border bg-white">
-      <div className="flex items-center gap-4 px-6 py-6 border-b border-border">
+    <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 border-r border-white/[0.08] bg-background">
+      <div className="flex items-center gap-4 px-6 py-6 border-b border-white/[0.08]">
         <div className="relative h-14 w-14 shrink-0">
           <Image src="/logo.png" alt="AC7 Group" fill className="object-contain" priority />
         </div>
         <div>
-          <h1 className="font-heading text-xl font-bold text-brand">{t.appName}</h1>
-          <p className="text-xs text-muted-foreground">{user?.name}</p>
+          <h1 className="font-heading text-xl font-bold text-white">{t.appName}</h1>
+          <p className="text-xs text-white/70">{user?.name}</p>
         </div>
       </div>
 
@@ -64,23 +64,25 @@ export function Sidebar() {
               href={item.href}
               className={cn(
                 "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
-                isActive ? "brand-gradient text-white shadow-lg" : "text-muted-foreground hover:bg-muted hover:text-brand"
+                isActive
+                  ? "bg-white/10 text-white shadow-sm"
+                  : "text-white/60 hover:bg-white/[0.06] hover:text-white"
               )}
             >
               <Icon className="h-5 w-5" />
               {item.label}
               {item.protected && !isActive && (
-                <span className="ml-auto text-[10px] bg-gold/30 text-brand-dark px-2 py-0.5 rounded-md font-bold">PIN</span>
+                <span className="ml-auto text-[10px] bg-accent/20 text-blue-200 px-2 py-0.5 rounded-md font-bold">PIN</span>
               )}
             </Link>
           );
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-border">
+      <div className="px-4 py-4 border-t border-white/[0.08]">
         <button
           onClick={logout}
-          className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"
+          className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm text-white/70 hover:bg-white/10 hover:text-red-300 transition-colors"
         >
           <LogOut className="h-5 w-5" />
           {t.login.logout}
@@ -105,7 +107,7 @@ export function MobileNav() {
 
   return (
     <>
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-header border-t border-border pb-[env(safe-area-inset-bottom)]">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-header border-t border-white/10 pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center justify-around px-1 py-2">
           {primaryItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -115,8 +117,8 @@ export function MobileNav() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-xl px-2 py-2 text-[10px] font-medium min-w-[56px] min-h-[48px] justify-center",
-                  isActive ? "text-brand" : "text-muted-foreground"
+                  "flex flex-col items-center gap-0.5 rounded-xl px-2 py-2 text-[10px] font-medium min-w-[56px] min-h-[48px] justify-center transition-colors",
+                  isActive ? "text-white" : "text-white/60"
                 )}
               >
                 <Icon className="h-5 w-5" />
@@ -128,8 +130,8 @@ export function MobileNav() {
             type="button"
             onClick={() => setMoreOpen(true)}
             className={cn(
-              "flex flex-col items-center gap-0.5 rounded-xl px-2 py-2 text-[10px] font-medium min-w-[56px] min-h-[48px] justify-center",
-              moreActive ? "text-brand" : "text-muted-foreground"
+              "flex flex-col items-center gap-0.5 rounded-xl px-2 py-2 text-[10px] font-medium min-w-[56px] min-h-[48px] justify-center transition-colors",
+              moreActive ? "text-white" : "text-white/60"
             )}
           >
             <MoreHorizontal className="h-5 w-5" />
@@ -141,7 +143,7 @@ export function MobileNav() {
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent className="sm:max-w-sm rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-brand">{t.appName}</DialogTitle>
+            <DialogTitle>{t.appName}</DialogTitle>
           </DialogHeader>
           <nav className="space-y-1 py-2">
             {moreItems.map((item) => {
@@ -154,7 +156,7 @@ export function MobileNav() {
                   onClick={() => setMoreOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium",
-                    isActive ? "brand-gradient text-white" : "hover:bg-muted text-foreground"
+                    isActive ? "bg-accent/10 text-accent" : "hover:bg-muted text-slate-700"
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -168,7 +170,7 @@ export function MobileNav() {
                 setMoreOpen(false);
                 logout();
               }}
-              className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm text-destructive hover:bg-destructive/10"
+              className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm text-red-600 hover:bg-red-50"
             >
               <LogOut className="h-5 w-5" />
               {t.login.logout}

@@ -23,6 +23,8 @@ export const t = {
     monthsElapsed: "Bilaha La Soo Dhaafay",
     groupGoal: "Hadafka Kooxda",
     goalProgress: "Horumarka Hadafka",
+    savingsRecords: "kayd",
+    cloudData: "Xogta Supabase (savings)",
   },
   members: {
     title: "Xubnaha",

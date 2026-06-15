@@ -29,7 +29,6 @@ import {
   deleteChatMessage,
   seedDefaultMembers,
 } from "@/lib/data-store";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { getConsecutiveMissedBefore } from "@/lib/calculations";
 import { resolveMemberStatus, shouldDeactivateLogin, getPayingMembers } from "@/lib/member-status";
@@ -58,6 +57,8 @@ interface DataContextValue {
 
 const DataContext = createContext<DataContextValue | null>(null);
 
+const LOAD_TIMEOUT_MS = 5000;
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
@@ -68,7 +69,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [bin, setBin] = useState<ArchivedMemberRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const syncingRef = useRef(false);
-  const cloudMode = isSupabaseConfigured();
 
   const syncMemberStatuses = useCallback(
     async (memberList: Member[], paymentList: Payment[], appSettings: AppSettings) => {
@@ -98,12 +98,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    let membersLoaded = false;
-    let paymentsLoaded = false;
-    let settingsLoaded = false;
-    let announcementsLoaded = false;
-    let chatsLoaded = false;
-    let binLoaded = false;
+    if (authLoading) return;
+
     let unsubMembers: (() => void) | undefined;
     let unsubPayments: (() => void) | undefined;
     let unsubSettings: (() => void) | undefined;
@@ -111,50 +107,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let unsubChats: (() => void) | undefined;
     let unsubBin: (() => void) | undefined;
 
-    const markAllLoaded = () => {
-      membersLoaded = true;
-      paymentsLoaded = true;
-      settingsLoaded = true;
-      announcementsLoaded = true;
-      chatsLoaded = true;
-      binLoaded = true;
-      setLoading(false);
-    };
+    const timeout = setTimeout(() => setLoading(false), LOAD_TIMEOUT_MS);
 
-    const checkLoaded = () => {
-      if (membersLoaded && paymentsLoaded && settingsLoaded && announcementsLoaded && chatsLoaded && binLoaded) {
+    const loadForLogin = () => {
+      unsubMembers = subscribeMembers((data) => {
+        setMembers(data);
         setLoading(false);
-      }
-    };
-
-    const clearData = () => {
-      setMembers([]);
-      setPayments([]);
-      setSettings(DEFAULT_SETTINGS);
-      setAnnouncements([]);
-      setChats([]);
-      setBin([]);
-    };
-
-    if (authLoading) return;
-
-    if (cloudMode && !user) {
-      seedDefaultMembers().finally(() => {
-        clearData();
-        markAllLoaded();
       });
-      return;
-    }
+    };
 
-    setLoading(true);
-    membersLoaded = false;
-    paymentsLoaded = false;
-    settingsLoaded = false;
-    announcementsLoaded = false;
-    chatsLoaded = false;
-    binLoaded = false;
+    const loadFull = () => {
+      let membersLoaded = false;
+      let paymentsLoaded = false;
+      let settingsLoaded = false;
+      let announcementsLoaded = false;
+      let chatsLoaded = false;
+      let binLoaded = false;
 
-    seedDefaultMembers().then(() => {
+      const checkLoaded = () => {
+        if (membersLoaded && paymentsLoaded && settingsLoaded && announcementsLoaded && chatsLoaded && binLoaded) {
+          setLoading(false);
+        }
+      };
+
       unsubMembers = subscribeMembers((data) => {
         setMembers(data);
         membersLoaded = true;
@@ -185,9 +160,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
         binLoaded = true;
         checkLoaded();
       });
-    });
+    };
+
+    setLoading(true);
+
+    seedDefaultMembers()
+      .then(() => {
+        if (user) {
+          loadFull();
+        } else {
+          loadForLogin();
+        }
+      })
+      .catch((err) => {
+        console.error("seed/load error:", err);
+        setLoading(false);
+      });
 
     return () => {
+      clearTimeout(timeout);
       unsubMembers?.();
       unsubPayments?.();
       unsubSettings?.();
@@ -195,7 +186,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       unsubChats?.();
       unsubBin?.();
     };
-  }, [user, authLoading, cloudMode]);
+  }, [user, authLoading]);
 
   useEffect(() => {
     if (!loading && members.length > 0 && user) {

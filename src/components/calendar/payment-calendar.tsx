@@ -65,7 +65,7 @@ export function PaymentCalendar({ payments }: PaymentCalendarProps) {
 
   return (
     <Card className="animate-fade-in-up overflow-hidden">
-      <CardHeader className="brand-gradient text-white">
+      <CardHeader className="brand-gradient text-white rounded-t-2xl">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <CardTitle className="text-white flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-gold" />
@@ -96,7 +96,7 @@ export function PaymentCalendar({ payments }: PaymentCalendarProps) {
       <CardContent className="p-4">
         <div className="grid grid-cols-7 gap-1 mb-2">
           {WEEKDAYS.map((day) => (
-            <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-2">
+            <div key={day} className="text-center text-xs font-semibold text-slate-500 py-2">
               {day}
             </div>
           ))}
@@ -114,23 +114,23 @@ export function PaymentCalendar({ payments }: PaymentCalendarProps) {
             return (
               <div
                 key={day}
-                className={`calendar-day rounded-lg border border-border p-1.5 ${
+                className={`calendar-day rounded-lg border p-1.5 ${
                   dayPayments.length > 0 ? "has-payment" : ""
-                } ${isToday ? "ring-2 ring-brand animate-pulse-glow" : ""}`}
+                } ${isToday ? "ring-2 ring-accent animate-pulse-glow" : ""}`}
               >
-                <div className={`text-xs font-semibold mb-1 ${isToday ? "text-brand" : "text-muted-foreground"}`}>
+                <div className={`text-xs font-semibold mb-1 ${isToday ? "text-accent" : "text-slate-600"}`}>
                   {day}
                 </div>
                 <div className="space-y-0.5">
                   {dayPayments.map((cp) => (
                     <div
                       key={cp.payment.id}
-                      className="text-[10px] leading-tight bg-brand/10 text-brand rounded px-1 py-0.5"
+                      className="text-[10px] leading-tight bg-muted text-accent rounded px-1 py-0.5"
                       title={`${cp.payment.memberName} — ${cp.time} — ${formatCurrency(cp.payment.amount)}`}
                     >
                       <span className="font-semibold">{cp.payment.memberName.split(" ")[0]}</span>
                       <br />
-                      <span className="text-muted-foreground">{cp.time}</span>
+                      <span className="text-accent">{cp.time}</span>
                     </div>
                   ))}
                 </div>
@@ -140,17 +140,17 @@ export function PaymentCalendar({ payments }: PaymentCalendarProps) {
         </div>
 
         {calendarPayments.length > 0 && (
-          <div className="mt-6 space-y-2 border-t border-border pt-4">
-            <h4 className="text-sm font-semibold text-brand">Faahfaahinta Bishan</h4>
+          <div className="mt-6 space-y-2 border-t border-slate-200 pt-4">
+            <h4 className="text-sm font-semibold text-slate-900">Faahfaahinta Bishan</h4>
             {calendarPayments.map((cp) => (
-              <div key={cp.payment.id} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-0">
+              <div key={cp.payment.id} className="flex items-center justify-between text-sm py-2 border-b border-slate-100 last:border-0">
                 <div>
-                  <span className="font-medium text-foreground">{cp.payment.memberName}</span>
-                  <span className="text-muted-foreground">
+                  <span className="font-medium text-slate-900">{cp.payment.memberName}</span>
+                  <span className="text-slate-500">
                     {" "}{t.calendar.paidOn} {cp.day} {getMonthNameByIndex(monthIndex)} {t.calendar.at} {cp.time}
                   </span>
                 </div>
-                <span className="font-mono-currency font-semibold text-brand">
+                <span className="font-mono-currency font-semibold text-accent">
                   {formatCurrency(cp.payment.amount)}
                 </span>
               </div>

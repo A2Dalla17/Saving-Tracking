@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useData } from "@/lib/hooks/use-data";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import { t } from "@/lib/somali";
 
 export default function LoginPage() {
@@ -21,7 +20,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const cloudMode = isSupabaseConfigured();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,17 +33,23 @@ export default function LoginPage() {
     setSubmitting(false);
   };
 
-  if (!cloudMode && loading) {
-    return <p className="text-muted-foreground">{t.common.loading}</p>;
+  if (loading && members.length === 0) {
+    return (
+      <Card className="w-full max-w-md animate-fade-in-up shadow-2xl shadow-black/20">
+        <CardContent className="py-12 text-center">
+          <p className="text-slate-500">{t.common.loading}</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <Card className="w-full max-w-md animate-fade-in-up shadow-xl border-brand/10">
-      <CardHeader className="text-center">
+    <Card className="w-full max-w-md animate-fade-in-up shadow-2xl shadow-black/20">
+      <CardHeader className="text-center pb-2">
         <div className="mx-auto mb-3 relative h-16 w-16">
           <Image src="/logo.png" alt="AC7 Group" fill className="object-contain" priority />
         </div>
-        <CardTitle className="text-brand text-2xl">{t.appName}</CardTitle>
+        <CardTitle className="text-2xl">{t.appName}</CardTitle>
         <CardDescription>{t.login.subtitle}</CardDescription>
       </CardHeader>
       <CardContent>
