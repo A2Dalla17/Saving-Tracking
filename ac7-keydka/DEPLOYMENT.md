@@ -40,6 +40,8 @@ Suggested: `ac7group.com`, `ac7kayd.com`, `aragticad.com`
 
 ## Step 2 — Firebase (Database)
 
+**Full guide:** see [FIREBASE_VERCEL_SETUP.md](./FIREBASE_VERCEL_SETUP.md) (Somali step-by-step)
+
 1. [Firebase Console](https://console.firebase.google.com) → Create project `ac7-keydka`
 2. Enable **Firestore** (production mode)
 3. Enable **Authentication** (custom tokens via API)

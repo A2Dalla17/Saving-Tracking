@@ -13,9 +13,17 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.admin == true;
     }
 
+    function isOwner(memberId) {
+      return isSignedIn() && request.auth.uid == memberId;
+    }
+
     match /members/{memberId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isOwner(memberId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["avatarUrl"])
+      );
     }
 
     match /payments/{paymentId} {

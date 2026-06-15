@@ -35,7 +35,8 @@ const STORAGE_KEYS = {
   CHATS: "ac7_chats",
   BIN: "ac7_bin",
   SEEDED: "ac7_seeded",
-  MIGRATED: "ac7_migrated_v4",
+  MIGRATED: "ac7_migrated_v5",
+  CLOUD_MIGRATED: "ac7_cloud_migrated",
 };
 
 function dispatchStorage() {
@@ -45,22 +46,44 @@ function dispatchStorage() {
 }
 
 function normalizeMember(raw: Partial<Member> & { id: string; name: string }): Member {
-  const profile = DEFAULT_MEMBER_PROFILES.find((p) => p.name === raw.name);
+  const isAdmin =
+    raw.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ||
+    raw.name === "Maamulaha";
+
   return {
     id: raw.id,
     name: raw.name,
     phone: raw.phone ?? "",
-    email: raw.email ?? profile?.email ?? "",
-    password: raw.password ?? (profile ? hashPassword(DEFAULT_MEMBER_PASSWORD) : undefined),
+    email: raw.email ?? "",
+    password: raw.password,
     joinDate: raw.joinDate ?? DEFAULT_SETTINGS.groupStartDate,
     endDate: raw.endDate,
-    monthlyFee: raw.monthlyFee ?? profile?.monthlyFee ?? DEFAULT_SETTINGS.monthlyFee,
-    annualTarget: raw.annualTarget ?? profile?.annualTarget ?? DEFAULT_SETTINGS.monthlyFee * 12,
-    loginActive: raw.loginActive ?? (raw.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()),
+    monthlyFee: raw.monthlyFee ?? DEFAULT_SETTINGS.monthlyFee,
+    annualTarget: raw.annualTarget ?? DEFAULT_SETTINGS.monthlyFee * 12,
+    loginActive: typeof raw.loginActive === "boolean" ? raw.loginActive : isAdmin,
     status: raw.status ?? "active",
     avatarUrl: raw.avatarUrl,
     createdAt: raw.createdAt ?? new Date().toISOString(),
   };
+}
+
+function profileDefaultsForName(name: string) {
+  return DEFAULT_MEMBER_PROFILES.find((p) => p.name === name);
+}
+
+function saveToLocalStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    const quota =
+      e instanceof DOMException &&
+      (e.name === "QuotaExceededError" || e.code === 22);
+    throw new Error(
+      quota
+        ? "Kaydinta browser-ka waa buuxday. Sawirka profile ka saar ama xog yar kaydi."
+        : "Kaydinta ma guulaysan"
+    );
+  }
 }
 
 function getLocalMembers(): Member[] {
@@ -105,7 +128,7 @@ function saveLocalBin(bin: ArchivedMemberRecord[]): void {
 }
 
 function saveLocalMembers(members: Member[]): void {
-  localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+  saveToLocalStorage(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
 }
 
 function saveLocalPayments(payments: Payment[]): void {
@@ -146,12 +169,16 @@ function ensureAdminCredentials(): void {
 
 export async function migrateMembers(): Promise<void> {
   if (typeof window === "undefined") return;
-  if (localStorage.getItem(STORAGE_KEYS.MIGRATED)) return;
+  if (localStorage.getItem(STORAGE_KEYS.MIGRATED) === "v5") return;
 
-  const members = getLocalMembers().map((m) => normalizeMember(m));
+  const rawData = localStorage.getItem(STORAGE_KEYS.MEMBERS);
   const adminHash = hashPassword(ADMIN_PASSWORD);
 
-  const updated = members.map((m) =>
+  let updated: Member[] = rawData
+    ? (JSON.parse(rawData) as Member[]).map((m) => normalizeMember(m))
+    : [];
+
+  updated = updated.map((m) =>
     m.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
       ? { ...m, password: adminHash, loginActive: true }
       : m
@@ -175,11 +202,55 @@ export async function migrateMembers(): Promise<void> {
   }
 
   saveLocalMembers(updated);
-  localStorage.setItem(STORAGE_KEYS.MIGRATED, "true");
+  localStorage.setItem(STORAGE_KEYS.MIGRATED, "v5");
+}
+
+export async function ensureCloudSetup(): Promise<void> {
+  if (typeof window === "undefined" || !isFirebaseConfigured()) return;
+
+  try {
+    await fetch("/api/setup/seed", { method: "POST" });
+  } catch {
+    // seed is best-effort before login
+  }
+
+  if (localStorage.getItem(STORAGE_KEYS.CLOUD_MIGRATED)) return;
+
+  const rawMembers = localStorage.getItem(STORAGE_KEYS.MEMBERS);
+  if (!rawMembers) return;
+
+  const members = JSON.parse(rawMembers) as Member[];
+  if (members.length === 0) return;
+
+  try {
+    const res = await fetch("/api/setup/migrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        members,
+        payments: JSON.parse(localStorage.getItem(STORAGE_KEYS.PAYMENTS) ?? "[]"),
+        settings: JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) ?? "null") ?? undefined,
+        announcements: JSON.parse(localStorage.getItem(STORAGE_KEYS.ANNOUNCEMENTS) ?? "[]"),
+        chats: JSON.parse(localStorage.getItem(STORAGE_KEYS.CHATS) ?? "[]"),
+      }),
+    });
+    const data = await res.json();
+    if (res.ok && data.imported) {
+      localStorage.setItem(STORAGE_KEYS.CLOUD_MIGRATED, "true");
+    }
+  } catch {
+    // migration can retry on next visit while firestore is still empty
+  }
 }
 
 export async function seedDefaultMembers(): Promise<void> {
   if (typeof window === "undefined") return;
+
+  if (isFirebaseConfigured()) {
+    await ensureCloudSetup();
+    return;
+  }
+
   ensureAdminCredentials();
   await migrateMembers();
   await archiveRemovedMembers();
@@ -204,9 +275,9 @@ export async function seedDefaultMembers(): Promise<void> {
     await addMember({
       name: profile.name,
       email: profile.email,
-      joinDate: DEFAULT_SETTINGS.groupStartDate,
       monthlyFee: profile.monthlyFee,
       annualTarget: profile.annualTarget,
+      joinDate: DEFAULT_SETTINGS.groupStartDate,
       loginActive: false,
       status: "active",
       password: hashPassword(DEFAULT_MEMBER_PASSWORD),
@@ -320,11 +391,15 @@ export function subscribeChats(callback: (messages: ChatMessage[]) => void): Uns
 }
 
 export async function addMember(member: Omit<Member, "id" | "createdAt">): Promise<Member> {
+  const profile = profileDefaultsForName(member.name);
   const newMember = normalizeMember({
     ...member,
     id: generateId(),
     createdAt: new Date().toISOString(),
-    password: member.password,
+    email: member.email ?? profile?.email ?? "",
+    monthlyFee: member.monthlyFee ?? profile?.monthlyFee,
+    annualTarget: member.annualTarget ?? profile?.annualTarget,
+    password: member.password ?? (profile ? hashPassword(DEFAULT_MEMBER_PASSWORD) : undefined),
     loginActive: member.loginActive ?? false,
     status: member.status ?? "active",
   });

@@ -1,12 +1,6 @@
 {
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "headers": [
-    {
-      "source": "/manifest.json",
-      "headers": [
-        { "key": "Content-Type", "value": "application/manifest+json" }
-      ]
-    }
-  ]
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "regions": ["iad1"]
 }

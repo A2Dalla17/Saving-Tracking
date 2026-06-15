@@ -9,13 +9,34 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithCustomToken, signOut as firebaseSignOut } from "firebase/auth";
+import { signInWithCustomToken, signOut as firebaseSignOut, onAuthStateChanged } from "firebase/auth";
 import { verifyPassword, isAdminEmail } from "@/lib/auth";
 import { ADMIN_EMAIL } from "@/lib/constants";
 import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
 import type { AuthUser, Member } from "@/types";
 
 const SESSION_KEY = "ac7_auth_user";
+
+function readStoredUser(): AuthUser | null {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem(SESSION_KEY) ?? sessionStorage.getItem(SESSION_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as AuthUser;
+  } catch {
+    return null;
+  }
+}
+
+function persistUser(user: AuthUser): void {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+function clearStoredUser(): void {
+  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
+}
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -59,7 +80,7 @@ async function loginWithFirebase(identifier: string, password: string) {
     await signInWithCustomToken(auth, data.token);
   }
 
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
+  persistUser(data.user);
   return { success: true as const, user: data.user as AuthUser };
 }
 
@@ -86,7 +107,7 @@ function loginLocally(identifier: string, password: string, members: Member[]) {
       member.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase(),
   };
 
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
+  persistUser(authUser);
   return { success: true as const, user: authUser };
 }
 
@@ -96,9 +117,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const stored = sessionStorage.getItem(SESSION_KEY);
-    if (stored) setUser(JSON.parse(stored));
-    setLoading(false);
+    if (!isFirebaseConfigured()) {
+      setUser(readStoredUser());
+      setLoading(false);
+      return;
+    }
+
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      setUser(readStoredUser());
+      setLoading(false);
+      return;
+    }
+
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      const stored = readStoredUser();
+      if (firebaseUser && stored) {
+        setUser(stored);
+      } else {
+        if (firebaseUser && !stored) {
+          try {
+            await firebaseSignOut(auth);
+          } catch {
+            // ignore
+          }
+        }
+        if (stored) clearStoredUser();
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return unsub;
   }, []);
 
   const login = useCallback(
@@ -134,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    sessionStorage.removeItem(SESSION_KEY);
+    clearStoredUser();
     setUser(null);
     const auth = getFirebaseAuth();
     if (auth) {

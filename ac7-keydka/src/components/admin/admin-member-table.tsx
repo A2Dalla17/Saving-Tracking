@@ -30,16 +30,19 @@ export function AdminMemberTable() {
   const [editMembers, setEditMembers] = useState<Member[]>(members);
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    setEditMembers(members);
-  }, [members]);
+    if (!dirty) setEditMembers(members);
+  }, [members, dirty]);
 
   const updateField = (id: string, field: keyof Member, value: string | number | boolean) => {
+    setDirty(true);
     setEditMembers((prev) => prev.map((m) => (m.id === id ? { ...m, [field]: value } : m)));
   };
 
   const updatePasswordDraft = (id: string, value: string) => {
+    setDirty(true);
     setPasswordDrafts((prev) => ({ ...prev, [id]: value }));
   };
 
@@ -101,9 +104,11 @@ export function AdminMemberTable() {
         }
       }
       setPasswordDrafts({});
+      setDirty(false);
       toast.success(t.admin.saved);
-    } catch {
-      toast.error(t.common.error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.common.error;
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -151,6 +156,7 @@ export function AdminMemberTable() {
           delete next[em.id];
           return next;
         });
+        setDirty(false);
         toast.success(t.admin.loginActivated);
       } catch {
         toast.error(t.common.error);
