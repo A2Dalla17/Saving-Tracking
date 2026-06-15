@@ -14,7 +14,7 @@ import { AdminMemberTable } from "@/components/admin/admin-member-table";
 import { AdminBin } from "@/components/admin/admin-bin";
 import { useData } from "@/lib/hooks/use-data";
 import { useAdmin } from "@/lib/hooks/use-admin";
-import { getDataMode } from "@/lib/firestore";
+import { getDataMode } from "@/lib/data-store";
 import { t } from "@/lib/somali";
 import type { AppSettings } from "@/types";
 
@@ -74,7 +74,7 @@ export function AdminPanel() {
               <Input type="password" maxLength={6} value={localSettings.adminPin} onChange={(e) => setLocalSettings({ ...localSettings, adminPin: e.target.value })} />
             </div>
             <div className="md:col-span-2 text-sm text-muted-foreground">
-              System: {getDataMode() === "firebase" ? t.settings.connected : t.settings.demo}
+              System: {getDataMode() === "supabase" ? t.settings.connected : t.settings.demo}
             </div>
           </CardContent>
         </Card>

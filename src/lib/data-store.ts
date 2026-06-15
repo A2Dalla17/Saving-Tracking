@@ -1,22 +1,21 @@
 "use client";
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { getSupabase, isSupabaseConfigured } from "./supabase";
 import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  setDoc,
-  addDoc,
-  deleteDoc,
-  updateDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  type Unsubscribe,
-} from "firebase/firestore";
-import { getDb, isFirebaseConfigured } from "./firebase";
+  rowToMember,
+  memberToRow,
+  rowToPayment,
+  paymentToRow,
+  rowToSettings,
+  settingsToRow,
+  rowToAnnouncement,
+  announcementToRow,
+  rowToChat,
+  chatToRow,
+  rowToBin,
+} from "./supabase-mappers";
 import {
-  COLLECTIONS,
   DEFAULT_SETTINGS,
   DEFAULT_MEMBER_PROFILES,
   DEFAULT_MEMBER_PASSWORD,
@@ -35,8 +34,84 @@ const STORAGE_KEYS = {
   CHATS: "ac7_chats",
   BIN: "ac7_bin",
   SEEDED: "ac7_seeded",
-  MIGRATED: "ac7_migrated_v4",
+  MIGRATED: "ac7_migrated_v5",
+  CLOUD_MIGRATED: "ac7_cloud_migrated",
 };
+
+type Unsubscribe = () => void;
+
+function subscribeRealtime(table: string, reload: () => void): Unsubscribe {
+  const supabase = getSupabase();
+  if (!supabase) return () => undefined;
+  reload();
+  const channel: RealtimeChannel = supabase
+    .channel(`rt-${table}-${Math.random().toString(36).slice(2)}`)
+    .on("postgres_changes", { event: "*", schema: "public", table }, () => reload())
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+async function fetchAllMembers(): Promise<Member[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("members")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => normalizeMember(rowToMember(row)));
+}
+
+async function fetchAllPayments(): Promise<Payment[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("payments")
+    .select("*")
+    .order("paid_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => rowToPayment(row));
+}
+
+async function fetchSettingsRow(): Promise<AppSettings> {
+  const supabase = getSupabase();
+  if (!supabase) return DEFAULT_SETTINGS;
+  const { data, error } = await supabase.from("app_settings").select("*").eq("id", "app").maybeSingle();
+  if (error) throw error;
+  return data ? rowToSettings(data) : DEFAULT_SETTINGS;
+}
+
+async function fetchAnnouncements(): Promise<Announcement[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const now = Date.now();
+  const { data, error } = await supabase
+    .from("announcements")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? [])
+    .map((row) => rowToAnnouncement(row))
+    .filter((a) => new Date(a.expiresAt).getTime() > now);
+}
+
+async function fetchAllChats(): Promise<ChatMessage[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("chats").select("*").order("sent_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((row) => rowToChat(row));
+}
+
+async function fetchAllBin(): Promise<ArchivedMemberRecord[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("bin").select("*").order("archived_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => rowToBin(row));
+}
 
 function dispatchStorage() {
   if (typeof window !== "undefined") {
@@ -45,22 +120,44 @@ function dispatchStorage() {
 }
 
 function normalizeMember(raw: Partial<Member> & { id: string; name: string }): Member {
-  const profile = DEFAULT_MEMBER_PROFILES.find((p) => p.name === raw.name);
+  const isAdmin =
+    raw.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ||
+    raw.name === "Maamulaha";
+
   return {
     id: raw.id,
     name: raw.name,
     phone: raw.phone ?? "",
-    email: raw.email ?? profile?.email ?? "",
-    password: raw.password ?? (profile ? hashPassword(DEFAULT_MEMBER_PASSWORD) : undefined),
+    email: raw.email ?? "",
+    password: raw.password,
     joinDate: raw.joinDate ?? DEFAULT_SETTINGS.groupStartDate,
     endDate: raw.endDate,
-    monthlyFee: raw.monthlyFee ?? profile?.monthlyFee ?? DEFAULT_SETTINGS.monthlyFee,
-    annualTarget: raw.annualTarget ?? profile?.annualTarget ?? DEFAULT_SETTINGS.monthlyFee * 12,
-    loginActive: raw.loginActive ?? (raw.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()),
+    monthlyFee: raw.monthlyFee ?? DEFAULT_SETTINGS.monthlyFee,
+    annualTarget: raw.annualTarget ?? DEFAULT_SETTINGS.monthlyFee * 12,
+    loginActive: typeof raw.loginActive === "boolean" ? raw.loginActive : isAdmin,
     status: raw.status ?? "active",
     avatarUrl: raw.avatarUrl,
     createdAt: raw.createdAt ?? new Date().toISOString(),
   };
+}
+
+function profileDefaultsForName(name: string) {
+  return DEFAULT_MEMBER_PROFILES.find((p) => p.name === name);
+}
+
+function saveToLocalStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    const quota =
+      e instanceof DOMException &&
+      (e.name === "QuotaExceededError" || e.code === 22);
+    throw new Error(
+      quota
+        ? "Kaydinta browser-ka waa buuxday. Sawirka profile ka saar ama xog yar kaydi."
+        : "Kaydinta ma guulaysan"
+    );
+  }
 }
 
 function getLocalMembers(): Member[] {
@@ -105,7 +202,7 @@ function saveLocalBin(bin: ArchivedMemberRecord[]): void {
 }
 
 function saveLocalMembers(members: Member[]): void {
-  localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+  saveToLocalStorage(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
 }
 
 function saveLocalPayments(payments: Payment[]): void {
@@ -146,12 +243,16 @@ function ensureAdminCredentials(): void {
 
 export async function migrateMembers(): Promise<void> {
   if (typeof window === "undefined") return;
-  if (localStorage.getItem(STORAGE_KEYS.MIGRATED)) return;
+  if (localStorage.getItem(STORAGE_KEYS.MIGRATED) === "v5") return;
 
-  const members = getLocalMembers().map((m) => normalizeMember(m));
+  const rawData = localStorage.getItem(STORAGE_KEYS.MEMBERS);
   const adminHash = hashPassword(ADMIN_PASSWORD);
 
-  const updated = members.map((m) =>
+  let updated: Member[] = rawData
+    ? (JSON.parse(rawData) as Member[]).map((m) => normalizeMember(m))
+    : [];
+
+  updated = updated.map((m) =>
     m.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
       ? { ...m, password: adminHash, loginActive: true }
       : m
@@ -175,11 +276,55 @@ export async function migrateMembers(): Promise<void> {
   }
 
   saveLocalMembers(updated);
-  localStorage.setItem(STORAGE_KEYS.MIGRATED, "true");
+  localStorage.setItem(STORAGE_KEYS.MIGRATED, "v5");
+}
+
+export async function ensureCloudSetup(): Promise<void> {
+  if (typeof window === "undefined" || !isSupabaseConfigured()) return;
+
+  try {
+    await fetch("/api/setup/seed", { method: "POST" });
+  } catch {
+    // seed is best-effort before login
+  }
+
+  if (localStorage.getItem(STORAGE_KEYS.CLOUD_MIGRATED)) return;
+
+  const rawMembers = localStorage.getItem(STORAGE_KEYS.MEMBERS);
+  if (!rawMembers) return;
+
+  const members = JSON.parse(rawMembers) as Member[];
+  if (members.length === 0) return;
+
+  try {
+    const res = await fetch("/api/setup/migrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        members,
+        payments: JSON.parse(localStorage.getItem(STORAGE_KEYS.PAYMENTS) ?? "[]"),
+        settings: JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) ?? "null") ?? undefined,
+        announcements: JSON.parse(localStorage.getItem(STORAGE_KEYS.ANNOUNCEMENTS) ?? "[]"),
+        chats: JSON.parse(localStorage.getItem(STORAGE_KEYS.CHATS) ?? "[]"),
+      }),
+    });
+    const data = await res.json();
+    if (res.ok && data.imported) {
+      localStorage.setItem(STORAGE_KEYS.CLOUD_MIGRATED, "true");
+    }
+  } catch {
+    // migration can retry on next visit while the database is still empty
+  }
 }
 
 export async function seedDefaultMembers(): Promise<void> {
   if (typeof window === "undefined") return;
+
+  if (isSupabaseConfigured()) {
+    await ensureCloudSetup();
+    return;
+  }
+
   ensureAdminCredentials();
   await migrateMembers();
   await archiveRemovedMembers();
@@ -191,10 +336,10 @@ export async function seedDefaultMembers(): Promise<void> {
     return;
   }
 
-  const db = getDb();
-  if (db) {
-    const snapshot = await getDocs(collection(db, COLLECTIONS.MEMBERS));
-    if (!snapshot.empty) {
+  const supabase = getSupabase();
+  if (supabase) {
+    const { count } = await supabase.from("members").select("*", { count: "exact", head: true });
+    if ((count ?? 0) > 0) {
       localStorage.setItem(STORAGE_KEYS.SEEDED, "true");
       return;
     }
@@ -204,9 +349,9 @@ export async function seedDefaultMembers(): Promise<void> {
     await addMember({
       name: profile.name,
       email: profile.email,
-      joinDate: DEFAULT_SETTINGS.groupStartDate,
       monthlyFee: profile.monthlyFee,
       annualTarget: profile.annualTarget,
+      joinDate: DEFAULT_SETTINGS.groupStartDate,
       loginActive: false,
       status: "active",
       password: hashPassword(DEFAULT_MEMBER_PASSWORD),
@@ -228,57 +373,53 @@ export async function seedDefaultMembers(): Promise<void> {
 }
 
 export function subscribeMembers(callback: (members: Member[]) => void): Unsubscribe {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     callback(getLocalMembers());
     const handler = () => callback(getLocalMembers());
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
   }
 
-  return onSnapshot(
-    query(collection(db, COLLECTIONS.MEMBERS), orderBy("createdAt", "desc")),
-    (snapshot) => {
-      callback(snapshot.docs.map((d) => normalizeMember({ id: d.id, ...d.data() } as Member)));
-    }
-  );
+  const reload = () => {
+    fetchAllMembers().then(callback).catch(console.error);
+  };
+  return subscribeRealtime("members", reload);
 }
 
 export function subscribePayments(callback: (payments: Payment[]) => void): Unsubscribe {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     callback(getLocalPayments());
     const handler = () => callback(getLocalPayments());
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
   }
 
-  return onSnapshot(
-    query(collection(db, COLLECTIONS.PAYMENTS), orderBy("paidAt", "desc")),
-    (snapshot) => {
-      callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Payment)));
-    }
-  );
+  const reload = () => {
+    fetchAllPayments().then(callback).catch(console.error);
+  };
+  return subscribeRealtime("payments", reload);
 }
 
 export function subscribeSettings(callback: (settings: AppSettings) => void): Unsubscribe {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     callback(getLocalSettings());
     const handler = () => callback(getLocalSettings());
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
   }
 
-  const settingsRef = doc(db, COLLECTIONS.SETTINGS, "app");
-  return onSnapshot(settingsRef, (snapshot) => {
-    callback(snapshot.exists() ? { ...DEFAULT_SETTINGS, ...snapshot.data() } as AppSettings : DEFAULT_SETTINGS);
-  });
+  const reload = () => {
+    fetchSettingsRow().then(callback).catch(console.error);
+  };
+  return subscribeRealtime("app_settings", reload);
 }
 
 export function subscribeAnnouncements(callback: (items: Announcement[]) => void): Unsubscribe {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     const load = () => {
       const now = Date.now();
       callback(getLocalAnnouncements().filter((a) => new Date(a.expiresAt).getTime() > now));
@@ -289,48 +430,43 @@ export function subscribeAnnouncements(callback: (items: Announcement[]) => void
     return () => window.removeEventListener("storage", handler);
   }
 
-  return onSnapshot(
-    query(collection(db, COLLECTIONS.ANNOUNCEMENTS), orderBy("createdAt", "desc")),
-    (snapshot) => {
-      const now = Date.now();
-      callback(
-        snapshot.docs
-          .map((d) => ({ id: d.id, ...d.data() } as Announcement))
-          .filter((a) => new Date(a.expiresAt).getTime() > now)
-      );
-    }
-  );
+  const reload = () => {
+    fetchAnnouncements().then(callback).catch(console.error);
+  };
+  return subscribeRealtime("announcements", reload);
 }
 
 export function subscribeChats(callback: (messages: ChatMessage[]) => void): Unsubscribe {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     callback(getLocalChats());
     const handler = () => callback(getLocalChats());
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
   }
 
-  return onSnapshot(
-    query(collection(db, COLLECTIONS.CHATS), orderBy("sentAt", "asc")),
-    (snapshot) => {
-      callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as ChatMessage)));
-    }
-  );
+  const reload = () => {
+    fetchAllChats().then(callback).catch(console.error);
+  };
+  return subscribeRealtime("chats", reload);
 }
 
 export async function addMember(member: Omit<Member, "id" | "createdAt">): Promise<Member> {
+  const profile = profileDefaultsForName(member.name);
   const newMember = normalizeMember({
     ...member,
     id: generateId(),
     createdAt: new Date().toISOString(),
-    password: member.password,
+    email: member.email ?? profile?.email ?? "",
+    monthlyFee: member.monthlyFee ?? profile?.monthlyFee,
+    annualTarget: member.annualTarget ?? profile?.annualTarget,
+    password: member.password ?? (profile ? hashPassword(DEFAULT_MEMBER_PASSWORD) : undefined),
     loginActive: member.loginActive ?? false,
     status: member.status ?? "active",
   });
 
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     const members = getLocalMembers();
     members.unshift(newMember);
     saveLocalMembers(members);
@@ -338,19 +474,26 @@ export async function addMember(member: Omit<Member, "id" | "createdAt">): Promi
     return newMember;
   }
 
-  const docRef = await addDoc(collection(db, COLLECTIONS.MEMBERS), newMember);
-  return { ...newMember, id: docRef.id };
+  const { error } = await supabase.from("members").insert(memberToRow(newMember));
+  if (error) throw error;
+  return newMember;
 }
 
 export async function updateMember(memberId: string, data: Partial<Member>): Promise<void> {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     const members = getLocalMembers().map((m) => (m.id === memberId ? normalizeMember({ ...m, ...data }) : m));
     saveLocalMembers(members);
     dispatchStorage();
     return;
   }
-  await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), data);
+
+  const existing = (await supabase.from("members").select("*").eq("id", memberId).single()).data;
+  if (!existing) return;
+  const merged = normalizeMember({ ...rowToMember(existing), ...data });
+  const row = memberToRow(merged);
+  const { error } = await supabase.from("members").update(row).eq("id", memberId);
+  if (error) throw error;
 }
 
 export async function deleteMember(memberId: string): Promise<void> {
@@ -361,8 +504,8 @@ export async function archiveMemberToBin(
   memberId: string,
   reason: "auto_removed" | "admin_removed"
 ): Promise<void> {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     const members = getLocalMembers();
     const member = members.find((m) => m.id === memberId);
     if (!member) return;
@@ -391,43 +534,55 @@ export async function archiveMemberToBin(
     return;
   }
 
-  // Firebase: archive as document in bin collection, then delete from active
-  const memberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
-  if (!memberDoc.exists()) return;
-  const member = normalizeMember({ id: memberDoc.id, ...memberDoc.data() } as Member);
+  const { data: memberRow, error: memberErr } = await supabase
+    .from("members")
+    .select("*")
+    .eq("id", memberId)
+    .maybeSingle();
+  if (memberErr) throw memberErr;
+  if (!memberRow) return;
+
+  const member = normalizeMember(rowToMember(memberRow));
   if (member.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return;
 
-  const paymentsSnap = await getDocs(collection(db, COLLECTIONS.PAYMENTS));
-  const memberPayments = paymentsSnap.docs
-    .filter((d) => d.data().memberId === memberId)
-    .map((d) => ({ id: d.id, ...d.data() } as Payment));
+  const { data: paymentRows, error: payErr } = await supabase
+    .from("payments")
+    .select("*")
+    .eq("member_id", memberId);
+  if (payErr) throw payErr;
+  const memberPayments = (paymentRows ?? []).map((row) => rowToPayment(row));
 
-  const chatsSnap = await getDocs(collection(db, COLLECTIONS.CHATS));
-  const memberChats = chatsSnap.docs
-    .filter((d) => d.data().memberId === memberId)
-    .map((d) => ({ id: d.id, ...d.data() } as ChatMessage));
+  const { data: chatRows, error: chatErr } = await supabase
+    .from("chats")
+    .select("*")
+    .eq("member_id", memberId);
+  if (chatErr) throw chatErr;
+  const memberChats = (chatRows ?? []).map((row) => rowToChat(row));
 
-  await addDoc(collection(db, COLLECTIONS.BIN), {
+  const archiveId = generateId();
+  const { error: binErr } = await supabase.from("bin").insert({
+    id: archiveId,
     member,
     payments: memberPayments,
     chats: memberChats,
-    archivedAt: new Date().toISOString(),
+    archived_at: new Date().toISOString(),
     reason,
-    totalPaid: memberPayments.reduce((sum, p) => sum + p.amount, 0),
+    total_paid: memberPayments.reduce((sum, p) => sum + p.amount, 0),
   });
+  if (binErr) throw binErr;
 
-  await deleteDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
-  for (const p of memberPayments) {
-    await deleteDoc(doc(db, COLLECTIONS.PAYMENTS, p.id));
+  await supabase.from("members").delete().eq("id", memberId);
+  if (memberPayments.length) {
+    await supabase.from("payments").delete().in("id", memberPayments.map((p) => p.id));
   }
-  for (const c of memberChats) {
-    await deleteDoc(doc(db, COLLECTIONS.CHATS, c.id));
+  if (memberChats.length) {
+    await supabase.from("chats").delete().in("id", memberChats.map((c) => c.id));
   }
 }
 
 export async function restoreMemberFromBin(archiveId: string): Promise<void> {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     const bin = getLocalBin();
     const record = bin.find((b) => b.id === archiveId);
     if (!record) return;
@@ -446,42 +601,40 @@ export async function restoreMemberFromBin(archiveId: string): Promise<void> {
     return;
   }
 
-  const archiveDoc = await getDoc(doc(db, COLLECTIONS.BIN, archiveId));
-  if (!archiveDoc.exists()) return;
-  const data = archiveDoc.data() as Omit<ArchivedMemberRecord, "id">;
+  const { data: archiveRow, error: archiveErr } = await supabase
+    .from("bin")
+    .select("*")
+    .eq("id", archiveId)
+    .maybeSingle();
+  if (archiveErr) throw archiveErr;
+  if (!archiveRow) return;
 
+  const data = rowToBin(archiveRow);
   const restored = { ...data.member, status: "active" as const, loginActive: false };
-  await addDoc(collection(db, COLLECTIONS.MEMBERS), restored);
 
-  for (const p of data.payments) {
-    await addDoc(collection(db, COLLECTIONS.PAYMENTS), p);
+  await supabase.from("members").insert(memberToRow(restored));
+  if (data.payments.length) {
+    await supabase.from("payments").insert(data.payments.map((p) => paymentToRow(p)));
   }
-  for (const c of data.chats) {
-    await addDoc(collection(db, COLLECTIONS.CHATS), c);
+  if (data.chats.length) {
+    await supabase.from("chats").insert(data.chats.map((c) => chatToRow(c)));
   }
-  await deleteDoc(doc(db, COLLECTIONS.BIN, archiveId));
+  await supabase.from("bin").delete().eq("id", archiveId);
 }
 
 export function subscribeBin(callback: (records: ArchivedMemberRecord[]) => void): Unsubscribe {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     callback(getLocalBin());
     const handler = () => callback(getLocalBin());
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
   }
 
-  return onSnapshot(
-    query(collection(db, COLLECTIONS.BIN), orderBy("archivedAt", "desc")),
-    (snapshot) => {
-      callback(
-        snapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        } as ArchivedMemberRecord))
-      );
-    }
-  );
+  const reload = () => {
+    fetchAllBin().then(callback).catch(console.error);
+  };
+  return subscribeRealtime("bin", reload);
 }
 
 export async function archiveRemovedMembers(): Promise<void> {
@@ -497,36 +650,39 @@ export async function archiveRemovedMembers(): Promise<void> {
 
 export async function addPayment(payment: Omit<Payment, "id">): Promise<Payment> {
   const newPayment: Payment = { ...payment, id: generateId() };
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     const payments = getLocalPayments();
     payments.unshift(newPayment);
     saveLocalPayments(payments);
     dispatchStorage();
     return newPayment;
   }
-  const docRef = await addDoc(collection(db, COLLECTIONS.PAYMENTS), { ...newPayment, note: newPayment.note ?? "" });
-  return { ...newPayment, id: docRef.id };
+  const { error } = await supabase.from("payments").insert(paymentToRow({ ...newPayment, note: newPayment.note ?? "" }));
+  if (error) throw error;
+  return newPayment;
 }
 
 export async function deletePayment(paymentId: string): Promise<void> {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     saveLocalPayments(getLocalPayments().filter((p) => p.id !== paymentId));
     dispatchStorage();
     return;
   }
-  await deleteDoc(doc(db, COLLECTIONS.PAYMENTS, paymentId));
+  const { error } = await supabase.from("payments").delete().eq("id", paymentId);
+  if (error) throw error;
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     saveLocalSettings(settings);
     dispatchStorage();
     return;
   }
-  await setDoc(doc(db, COLLECTIONS.SETTINGS, "app"), settings, { merge: true });
+  const { error } = await supabase.from("app_settings").upsert(settingsToRow(settings));
+  if (error) throw error;
 }
 
 export async function addAnnouncement(message: string, durationHours: number): Promise<Announcement> {
@@ -537,8 +693,8 @@ export async function addAnnouncement(message: string, durationHours: number): P
     expiresAt: new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString(),
   };
 
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     const items = getLocalAnnouncements();
     items.unshift(item);
     saveLocalAnnouncements(items);
@@ -546,8 +702,9 @@ export async function addAnnouncement(message: string, durationHours: number): P
     return item;
   }
 
-  const docRef = await addDoc(collection(db, COLLECTIONS.ANNOUNCEMENTS), item);
-  return { ...item, id: docRef.id };
+  const { error } = await supabase.from("announcements").insert(announcementToRow(item));
+  if (error) throw error;
+  return item;
 }
 
 export async function addChatMessage(memberId: string, message: string, fromAdmin: boolean): Promise<ChatMessage> {
@@ -559,8 +716,8 @@ export async function addChatMessage(memberId: string, message: string, fromAdmi
     sentAt: new Date().toISOString(),
   };
 
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     const chats = getLocalChats();
     chats.push(item);
     saveLocalChats(chats);
@@ -568,27 +725,28 @@ export async function addChatMessage(memberId: string, message: string, fromAdmi
     return item;
   }
 
-  const docRef = await addDoc(collection(db, COLLECTIONS.CHATS), item);
-  return { ...item, id: docRef.id };
+  const { error } = await supabase.from("chats").insert(chatToRow(item));
+  if (error) throw error;
+  return item;
 }
 
 export async function deleteChatMessage(chatId: string): Promise<void> {
-  const db = getDb();
-  if (!db) {
+  const supabase = getSupabase();
+  if (!supabase) {
     saveLocalChats(getLocalChats().filter((c) => c.id !== chatId));
     dispatchStorage();
     return;
   }
-  await deleteDoc(doc(db, COLLECTIONS.CHATS, chatId));
+  const { error } = await supabase.from("chats").delete().eq("id", chatId);
+  if (error) throw error;
 }
 
 export async function fetchSettings(): Promise<AppSettings> {
-  const db = getDb();
-  if (!db) return getLocalSettings();
-  const snapshot = await getDoc(doc(db, COLLECTIONS.SETTINGS, "app"));
-  return snapshot.exists() ? { ...DEFAULT_SETTINGS, ...snapshot.data() } as AppSettings : DEFAULT_SETTINGS;
+  const supabase = getSupabase();
+  if (!supabase) return getLocalSettings();
+  return fetchSettingsRow();
 }
 
-export function getDataMode(): "firebase" | "demo" {
-  return isFirebaseConfigured() ? "firebase" : "demo";
+export function getDataMode(): "supabase" | "demo" {
+  return isSupabaseConfigured() ? "supabase" : "demo";
 }

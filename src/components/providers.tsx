@@ -9,8 +9,8 @@ import { PwaRegister } from "@/components/shared/pwa-register";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <DataProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <DataProvider>
         <AdminProvider>
           <PwaRegister />
           <AppShell>{children}</AppShell>
@@ -27,7 +27,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             richColors
           />
         </AdminProvider>
-      </AuthProvider>
-    </DataProvider>
+      </DataProvider>
+    </AuthProvider>
   );
 }

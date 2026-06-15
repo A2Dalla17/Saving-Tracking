@@ -14,8 +14,8 @@ Users (Web + iOS + Android)
 Vercel (Frontend + Backend API)
   Next.js 15 + /api/auth/login + /api/recovery/*
         |
-Firebase (Database)
-  Firestore + Auth custom tokens + security rules
+Supabase (Database)
+  PostgreSQL + Row Level Security + service role for API
 ```
 
 **Monthly cost estimate (small private group):**
@@ -24,7 +24,7 @@ Firebase (Database)
 |---------|------|
 | Domain (.com) | ~$12/year |
 | Vercel (Hobby) | Free |
-| Firebase Spark | Free |
+| Supabase (Free tier) | Free |
 | Apple Developer | $99/year |
 | Google Play | $25 one-time |
 
@@ -38,22 +38,13 @@ Suggested: `ac7group.com`, `ac7kayd.com`, `aragticad.com`
 
 ---
 
-## Step 2 — Firebase (Database)
+## Step 2 — Supabase (Database)
 
-1. [Firebase Console](https://console.firebase.google.com) → Create project `ac7-keydka`
-2. Enable **Firestore** (production mode)
-3. Enable **Authentication** (custom tokens via API)
-4. Add Web app → copy config values
-5. Service accounts → Generate private key → use for `FIREBASE_SERVICE_ACCOUNT_JSON`
+**Full guide:** see [SUPABASE_VERCEL_SETUP.md](./SUPABASE_VERCEL_SETUP.md) (Somali step-by-step)
 
-Deploy rules:
-```bash
-npm install -g firebase-tools
-firebase login
-cd ac7-keydka
-firebase use --add
-npm run firebase:deploy
-```
+1. [Supabase](https://supabase.com) → Create project
+2. SQL Editor → run `supabase/schema.sql`
+3. Project Settings → API → copy URL, anon key, service_role key
 
 ---
 
@@ -61,8 +52,9 @@ npm run firebase:deploy
 
 Copy `.env.example` → `.env.local`. Set on Vercel for production:
 
-- All `NEXT_PUBLIC_FIREBASE_*` vars
-- `FIREBASE_SERVICE_ACCOUNT_JSON` (full JSON, one line)
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 - `SMTP_*` for Gmail recovery
 
 Gmail app password: Google Account → Security → App passwords
@@ -77,7 +69,6 @@ Gmail app password: Google Account → Security → App passwords
 4. Deploy
 5. Settings → Domains → add your domain
 6. DNS at registrar: A record `76.76.21.21`, CNAME www → `cname.vercel-dns.com`
-7. Firebase Auth → Authorized domains → add your domain
 
 ---
 
@@ -101,7 +92,7 @@ npm run mobile:ios       # Xcode → Archive → App Store Connect
 
 - Renew domain yearly
 - Renew Apple Developer yearly
-- Backup Firestore (Firebase Console export)
+- Backup Supabase (Dashboard → Database → Backups)
 - Change admin PIN and default passwords after launch
 
 ---
@@ -110,7 +101,8 @@ npm run mobile:ios       # Xcode → Archive → App Store Connect
 
 | Problem | Fix |
 |---------|-----|
-| Login fails | Check `FIREBASE_SERVICE_ACCOUNT_JSON` on Vercel |
-| Permission denied | Run `npm run firebase:deploy` |
+| Login fails | Check `SUPABASE_SERVICE_ROLE_KEY` on Vercel |
+| Demo mode | Set all 3 Supabase env vars → redeploy |
+| Table errors | Run `supabase/schema.sql` in SQL Editor |
 | No recovery email | Set Gmail `SMTP_PASS` |
 | Blank mobile app | Set `CAPACITOR_SERVER_URL` to HTTPS URL |

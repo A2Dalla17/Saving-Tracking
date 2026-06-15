@@ -28,7 +28,9 @@ import {
   addChatMessage,
   deleteChatMessage,
   seedDefaultMembers,
-} from "@/lib/firestore";
+} from "@/lib/data-store";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { getConsecutiveMissedBefore } from "@/lib/calculations";
 import { resolveMemberStatus, shouldDeactivateLogin, getPayingMembers } from "@/lib/member-status";
 import type { Member, Payment, AppSettings, Announcement, ChatMessage, ArchivedMemberRecord } from "@/types";
@@ -57,6 +59,7 @@ interface DataContextValue {
 const DataContext = createContext<DataContextValue | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -65,6 +68,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [bin, setBin] = useState<ArchivedMemberRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const syncingRef = useRef(false);
+  const cloudMode = isSupabaseConfigured();
 
   const syncMemberStatuses = useCallback(
     async (memberList: Member[], paymentList: Payment[], appSettings: AppSettings) => {
@@ -107,11 +111,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let unsubChats: (() => void) | undefined;
     let unsubBin: (() => void) | undefined;
 
+    const markAllLoaded = () => {
+      membersLoaded = true;
+      paymentsLoaded = true;
+      settingsLoaded = true;
+      announcementsLoaded = true;
+      chatsLoaded = true;
+      binLoaded = true;
+      setLoading(false);
+    };
+
     const checkLoaded = () => {
       if (membersLoaded && paymentsLoaded && settingsLoaded && announcementsLoaded && chatsLoaded && binLoaded) {
         setLoading(false);
       }
     };
+
+    const clearData = () => {
+      setMembers([]);
+      setPayments([]);
+      setSettings(DEFAULT_SETTINGS);
+      setAnnouncements([]);
+      setChats([]);
+      setBin([]);
+    };
+
+    if (authLoading) return;
+
+    if (cloudMode && !user) {
+      seedDefaultMembers().finally(() => {
+        clearData();
+        markAllLoaded();
+      });
+      return;
+    }
+
+    setLoading(true);
+    membersLoaded = false;
+    paymentsLoaded = false;
+    settingsLoaded = false;
+    announcementsLoaded = false;
+    chatsLoaded = false;
+    binLoaded = false;
 
     seedDefaultMembers().then(() => {
       unsubMembers = subscribeMembers((data) => {
@@ -154,13 +195,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       unsubChats?.();
       unsubBin?.();
     };
-  }, []);
+  }, [user, authLoading, cloudMode]);
 
   useEffect(() => {
-    if (!loading && members.length > 0) {
+    if (!loading && members.length > 0 && user) {
       syncMemberStatuses(members, payments, settings);
     }
-  }, [members, payments, settings, loading, syncMemberStatuses]);
+  }, [members, payments, settings, loading, user, syncMemberStatuses]);
 
   const createMember = useCallback(async (data: Omit<Member, "id" | "createdAt">) => addMember(data), []);
   const editMember = useCallback(async (id: string, data: Partial<Member>) => updateMember(id, data), []);

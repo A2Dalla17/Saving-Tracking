@@ -58,15 +58,15 @@ Configure SMTP in `.env.local` (see `.env.example`).
 
 ## Configuration
 
-Copy `.env.example` → `.env.local` for Firebase cloud sync and Gmail recovery.
+Copy `.env.example` → `.env.local` for Supabase cloud sync and Gmail recovery.
 
-Without Firebase: runs in **demo mode** (localStorage) — works offline on your computer.
+Without Supabase: runs in **demo mode** (localStorage) — works offline on your computer.
 
 ## Production Deployment
 
 See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for the full guide:
 - Buy domain + connect to Vercel
-- Firebase database setup
+- Supabase database setup
 - App Store + Play Store (Capacitor)
 - Environment variables
 - Security checklist

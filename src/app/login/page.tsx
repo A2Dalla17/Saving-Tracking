@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useData } from "@/lib/hooks/use-data";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { t } from "@/lib/somali";
 
 export default function LoginPage() {
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const cloudMode = isSupabaseConfigured();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +35,7 @@ export default function LoginPage() {
     setSubmitting(false);
   };
 
-  if (loading) {
+  if (!cloudMode && loading) {
     return <p className="text-muted-foreground">{t.common.loading}</p>;
   }
 

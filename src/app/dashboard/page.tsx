@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
+import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatsCards } from "@/components/dashboard/stats-cards";
 import { SavingsChart } from "@/components/dashboard/savings-chart";
@@ -14,6 +16,19 @@ import { t } from "@/lib/somali";
 
 export default function DashboardPage() {
   const { members, payments, settings, loading } = useData();
+  const [supabaseTestData, setSupabaseTestData] = useState<Record<string, unknown>[]>([]);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data, error } = await supabase.from("members").select("*");
+      console.log("SUPABASE DATA:", data, error);
+      setSupabaseTestData(data || []);
+      setSupabaseError(error?.message ?? null);
+    };
+
+    fetchData();
+  }, []);
 
   if (loading) {
     return (
@@ -80,6 +95,20 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="animate-fade-in-up border-dashed border-brand/30">
+          <CardHeader>
+            <CardTitle className="text-brand text-base">Supabase Test (members)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {supabaseError && (
+              <p className="text-sm text-destructive mb-2">{supabaseError}</p>
+            )}
+            <pre className="text-xs overflow-auto max-h-48 bg-muted/50 p-3 rounded-lg">
+              {JSON.stringify(supabaseTestData, null, 2)}
+            </pre>
           </CardContent>
         </Card>
       </div>
