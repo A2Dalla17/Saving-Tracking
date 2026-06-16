@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { rowToSavings } from "@/lib/supabase-mappers";
-import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { StatsCards } from "@/components/dashboard/stats-cards";
 import { SavingsChart } from "@/components/dashboard/savings-chart";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useData } from "@/lib/hooks/use-data";
 import { calculateGroupStats, buildSavingsChartData } from "@/lib/calculations";
 import { getPayingMembers, filterPayingPayments } from "@/lib/member-status";
+import { PageLoading } from "@/components/shared/page-status";
 import { t } from "@/lib/somali";
 import type { Payment, Savings } from "@/types";
 
@@ -91,9 +92,9 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-white/80">{t.common.loading}</p>
-      </div>
+      <PageLayout title={t.dashboard.title} subtitle={t.dashboard.subtitle}>
+        <PageLoading />
+      </PageLayout>
     );
   }
 
@@ -104,15 +105,12 @@ export default function DashboardPage() {
   const recentPayments = payingPayments.slice(0, 5);
 
   return (
-    <div>
-      <PageHeader title={t.dashboard.title} subtitle={t.dashboard.subtitle} />
-
-      <div className="space-y-6">
-        {cloudMode && (
+    <PageLayout title={t.dashboard.title} subtitle={t.dashboard.subtitle}>
+      {cloudMode && (
           <Card>
             <CardContent className="py-3 px-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span className="text-slate-600 font-medium">{t.settings.connected}</span>
-              <span className="text-slate-500">
+              <span className="text-muted-foreground font-medium">{t.settings.connected}</span>
+              <span className="text-muted-foreground">
                 {savingsLoading ? t.common.loading : `${savings.length} ${t.dashboard.savingsRecords}`}
               </span>
             </CardContent>
@@ -121,7 +119,7 @@ export default function DashboardPage() {
 
         {savingsError && (
           <Card className="border-destructive/40">
-            <CardContent className="py-3 px-4 text-sm text-destructive">
+            <CardContent className="py-3 px-4 text-sm text-card-foreground">
               Supabase: {savingsError}
             </CardContent>
           </Card>
@@ -132,13 +130,13 @@ export default function DashboardPage() {
         <Card className="animate-fade-in-up">
           <CardContent className="p-5 sm:p-6">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-slate-600">{t.dashboard.groupGoal}</span>
-              <span className="font-mono-currency text-sm font-semibold text-accent">
+              <span className="text-sm font-medium text-muted-foreground">{t.dashboard.groupGoal}</span>
+              <span className="font-mono-currency text-sm font-semibold text-card-foreground">
                 {groupStats.goalProgress.toFixed(0)}%
               </span>
             </div>
             <Progress value={groupStats.goalProgress} className="h-3" />
-            <div className="flex justify-between mt-2 text-xs text-slate-500">
+            <div className="flex justify-between mt-2 text-xs text-muted-foreground">
               <CurrencyDisplay amount={groupStats.totalSavings} size="sm" />
               <span>/ <CurrencyDisplay amount={groupStats.groupGoal} size="sm" /></span>
             </div>
@@ -153,22 +151,22 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {recentPayments.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">{t.dashboard.noPayments}</p>
+              <p className="text-muted-foreground text-center py-8">{t.dashboard.noPayments}</p>
             ) : (
               <div className="space-y-3">
                 {recentPayments.map((payment) => (
                   <div
                     key={payment.id}
-                    className="flex items-center justify-between py-3 border-b border-slate-200 last:border-0"
+                    className="flex items-center justify-between py-3 border-b border-border last:border-0"
                   >
                     <div>
-                      <p className="font-medium text-slate-900">{payment.memberName}</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="font-medium text-card-foreground">{payment.memberName}</p>
+                      <p className="text-xs text-muted-foreground">
                         {payment.month} {payment.year} ·{" "}
                         {format(new Date(payment.paidAt), "MMM d, yyyy 'at' h:mm a")}
                       </p>
                     </div>
-                    <CurrencyDisplay amount={payment.amount} size="sm" className="text-accent" />
+                    <CurrencyDisplay amount={payment.amount} size="sm" className="text-card-foreground" />
                   </div>
                 ))}
               </div>
@@ -177,18 +175,17 @@ export default function DashboardPage() {
         </Card>
 
         {cloudMode && (
-          <Card className="animate-fade-in-up border-dashed border-slate-300">
+          <Card className="animate-fade-in-up border-dashed border-border">
             <CardHeader>
               <CardTitle className="text-base">{t.dashboard.cloudData}</CardTitle>
             </CardHeader>
             <CardContent>
-              <pre className="text-xs overflow-auto max-h-48 bg-muted border border-border p-3 rounded-lg text-slate-700">
+              <pre className="text-xs overflow-auto max-h-48 bg-muted border border-border p-3 rounded-lg text-muted-foreground">
                 {JSON.stringify(savings, null, 2)}
               </pre>
             </CardContent>
           </Card>
         )}
-      </div>
-    </div>
+    </PageLayout>
   );
 }

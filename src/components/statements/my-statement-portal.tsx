@@ -54,7 +54,7 @@ export function MyStatementPortal() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <>
       <Card className="animate-fade-in-up">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -64,7 +64,7 @@ export function MyStatementPortal() {
         </CardHeader>
         <CardContent className="space-y-4">
           {selectedMember && (
-            <p className="text-lg font-heading font-semibold text-slate-900">{selectedMember.name}</p>
+            <p className="text-lg font-heading font-semibold text-card-foreground">{selectedMember.name}</p>
           )}
         </CardContent>
       </Card>
@@ -73,41 +73,41 @@ export function MyStatementPortal() {
         <Card className="animate-fade-in-up">
           <CardHeader>
             <CardTitle>{t.myStatement.yourStats}</CardTitle>
-            <p className="text-lg font-heading font-bold text-slate-900">{memberStats.member.name}</p>
+            <p className="text-lg font-heading font-bold text-card-foreground">{memberStats.member.name}</p>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-muted border border-border">
-                <p className="text-xs text-slate-500">{t.myStatement.totalPaid}</p>
-                <CurrencyDisplay amount={memberStats.totalPaid} size="md" className="text-slate-900" />
+                <p className="text-xs text-muted-foreground">{t.myStatement.totalPaid}</p>
+                <CurrencyDisplay amount={memberStats.totalPaid} size="md" className="text-card-foreground" />
               </div>
               <div className="p-4 rounded-xl bg-muted border border-border">
-                <p className="text-xs text-slate-500">{t.myStatement.yourShare}</p>
-                <p className="font-mono-currency text-xl font-bold text-accent">
+                <p className="text-xs text-muted-foreground">{t.myStatement.yourShare}</p>
+                <p className="font-mono-currency text-xl font-bold text-card-foreground">
                   {memberStats.sharePercent.toFixed(1)}%
                 </p>
               </div>
               <div className="p-4 rounded-xl bg-muted border border-border">
-                <p className="text-xs text-slate-500">{t.myStatement.yourDebt}</p>
+                <p className="text-xs text-muted-foreground">{t.myStatement.yourDebt}</p>
                 <CurrencyDisplay
                   amount={memberStats.debt}
                   size="md"
-                  className={memberStats.debt > 0 ? "text-destructive" : "text-success"}
+                  className="text-card-foreground"
                 />
               </div>
               <div className="p-4 rounded-xl bg-muted border border-border">
-                <p className="text-xs text-slate-500">{t.myStatement.monthsPaid}</p>
-                <p className="font-mono-currency text-xl font-bold text-slate-900">{memberStats.monthsPaid}</p>
+                <p className="text-xs text-muted-foreground">{t.myStatement.monthsPaid}</p>
+                <p className="font-mono-currency text-xl font-bold text-card-foreground">{memberStats.monthsPaid}</p>
               </div>
             </div>
 
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>{t.members.share}</span>
-                <span className="font-semibold text-accent">{memberStats.sharePercent.toFixed(1)}%</span>
+                <span className="font-semibold text-card-foreground">{memberStats.sharePercent.toFixed(1)}%</span>
               </div>
               <Progress value={Math.min(memberStats.sharePercent, 100)} />
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 {t.members.example}: {memberStats.monthsPaid} bil × ${settings.monthlyFee} = {memberStats.sharePercent.toFixed(1)}% kooxda
               </p>
             </div>
@@ -125,6 +125,6 @@ export function MyStatementPortal() {
           </CardContent>
         </Card>
       )}
-    </div>
+    </>
   );
 }

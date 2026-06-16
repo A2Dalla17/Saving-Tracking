@@ -1,9 +1,10 @@
 "use client";
 
-import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { PaymentCalendar } from "@/components/calendar/payment-calendar";
 import { useData } from "@/lib/hooks/use-data";
 import { filterPayingPayments } from "@/lib/member-status";
+import { PageLoading } from "@/components/shared/page-status";
 import { t } from "@/lib/somali";
 
 export default function CalendarPage() {
@@ -11,16 +12,15 @@ export default function CalendarPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-muted-foreground">{t.common.loading}</p>
-      </div>
+      <PageLayout title={t.calendar.title} subtitle={t.calendar.subtitle}>
+        <PageLoading />
+      </PageLayout>
     );
   }
 
   return (
-    <div>
-      <PageHeader title={t.calendar.title} subtitle={t.calendar.subtitle} />
+    <PageLayout title={t.calendar.title} subtitle={t.calendar.subtitle}>
       <PaymentCalendar payments={filterPayingPayments(members, payments)} />
-    </div>
+    </PageLayout>
   );
 }

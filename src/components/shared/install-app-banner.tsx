@@ -60,14 +60,14 @@ export function InstallAppBanner() {
   if (dismissed || (!deferredPrompt && !showIosHint)) return null;
 
   return (
-    <div className="mb-4 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-lg animate-fade-in-up">
+    <div className="rounded-2xl border border-border surface-light bg-card p-4 sm:p-5 shadow-lg animate-fade-in-up">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-white">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl surface-dark brand-gradient text-white">
           <Download className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-slate-900 text-sm">{t.pwa.installTitle}</p>
-          <p className="text-xs text-slate-500 mt-1">{t.pwa.installDesc}</p>
+          <p className="font-semibold text-card-foreground text-sm">{t.pwa.installTitle}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t.pwa.installDesc}</p>
           {showIosHint && !deferredPrompt && (
             <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1 flex-wrap">
               <Share className="h-3.5 w-3.5" />
@@ -83,7 +83,7 @@ export function InstallAppBanner() {
                 {t.pwa.installBtn}
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={handleDismiss}>
+            <Button size="sm" variant="outline" onClick={handleDismiss}>
               {t.pwa.later}
             </Button>
           </div>
@@ -91,7 +91,7 @@ export function InstallAppBanner() {
         <button
           type="button"
           onClick={handleDismiss}
-          className="text-slate-400 hover:text-slate-600 shrink-0"
+          className="text-muted-foreground hover:text-card-foreground shrink-0"
           aria-label={t.common.close}
         >
           <X className="h-4 w-4" />

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { ADMIN_PIN, MAX_PIN_ATTEMPTS } from "@/lib/constants";
+import { useHydrated } from "@/lib/hooks/use-hydrated";
 
 const ATTEMPTS_KEY = "ac7_pin_attempts";
 const UNLOCK_KEY = "ac7_admin_unlocked";
@@ -19,18 +20,17 @@ interface AdminContextValue {
 
 const AdminContext = createContext<AdminContextValue | null>(null);
 
-function getStoredAttempts(): number {
-  if (typeof window === "undefined") return 0;
-  return parseInt(sessionStorage.getItem(ATTEMPTS_KEY) ?? "0", 10);
-}
-
 export function AdminProvider({ children }: { children: ReactNode }) {
+  const hydrated = useHydrated();
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
 
   useEffect(() => {
-    setFailedAttempts(getStoredAttempts());
-  }, []);
+    if (!hydrated) return;
+    const attempts = parseInt(sessionStorage.getItem(ATTEMPTS_KEY) ?? "0", 10);
+    setFailedAttempts(attempts);
+    setIsUnlocked(sessionStorage.getItem(UNLOCK_KEY) === "true");
+  }, [hydrated]);
 
   const isLocked = failedAttempts >= MAX_PIN_ATTEMPTS;
 
@@ -43,11 +43,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       return true;
     }
 
-    const newAttempts = getStoredAttempts() + 1;
+    const newAttempts = failedAttempts + 1;
     sessionStorage.setItem(ATTEMPTS_KEY, String(newAttempts));
     setFailedAttempts(newAttempts);
     return false;
-  }, []);
+  }, [failedAttempts]);
 
   const unlockWithRecovery = useCallback(async (code: string): Promise<boolean> => {
     try {

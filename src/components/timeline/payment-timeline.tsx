@@ -32,12 +32,12 @@ export function PaymentTimeline({ payments }: PaymentTimelineProps) {
         >
           <CardContent className="p-5">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple/10">
-                <CircleDollarSign className="h-6 w-6 text-purple" />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted">
+                <CircleDollarSign className="h-6 w-6 text-card-foreground" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-navy">
-                  <span className="text-purple">{payment.memberName}</span>{" "}
+                <p className="font-medium text-card-foreground">
+                  <span className="font-semibold">{payment.memberName}</span>{" "}
                   {t.timeline.paidBy}
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -45,7 +45,7 @@ export function PaymentTimeline({ payments }: PaymentTimelineProps) {
                   {format(new Date(payment.paidAt), "MMM d, yyyy 'at' h:mm a")}
                 </p>
               </div>
-              <CurrencyDisplay amount={payment.amount} size="sm" className="text-gold shrink-0" />
+              <CurrencyDisplay amount={payment.amount} size="sm" className="text-card-foreground shrink-0" />
             </div>
           </CardContent>
         </Card>

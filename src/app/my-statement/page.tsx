@@ -1,8 +1,9 @@
 "use client";
 
-import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { MyStatementPortal } from "@/components/statements/my-statement-portal";
 import { useData } from "@/lib/hooks/use-data";
+import { PageLoading } from "@/components/shared/page-status";
 import { t } from "@/lib/somali";
 
 export default function MyStatementPage() {
@@ -10,16 +11,15 @@ export default function MyStatementPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-muted-foreground">{t.common.loading}</p>
-      </div>
+      <PageLayout title={t.myStatement.title} subtitle={t.myStatement.subtitle}>
+        <PageLoading />
+      </PageLayout>
     );
   }
 
   return (
-    <div>
-      <PageHeader title={t.myStatement.title} subtitle={t.myStatement.subtitle} />
+    <PageLayout title={t.myStatement.title} subtitle={t.myStatement.subtitle}>
       <MyStatementPortal />
-    </div>
+    </PageLayout>
   );
 }

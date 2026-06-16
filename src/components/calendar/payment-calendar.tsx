@@ -65,38 +65,38 @@ export function PaymentCalendar({ payments }: PaymentCalendarProps) {
 
   return (
     <Card className="animate-fade-in-up overflow-hidden">
-      <CardHeader className="brand-gradient text-white rounded-t-2xl">
+      <CardHeader className="bg-card border-b border-border rounded-t-2xl">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <CardTitle className="text-white flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-gold" />
+          <CardTitle className="text-card-foreground flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-card-foreground" />
             {getMonthNameByIndex(monthIndex)} {year}
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setYear(year - 1)} className="text-white hover:bg-white/20">
+            <Button variant="outline" size="sm" onClick={() => setYear(year - 1)}>
               {t.calendar.prevYear}
             </Button>
-            <Button variant="ghost" size="icon" onClick={goToPrevMonth} className="text-white hover:bg-white/20">
+            <Button variant="outline" size="icon" onClick={goToPrevMonth}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={goToToday} className="text-gold hover:bg-white/20 font-semibold">
+            <Button variant="default" size="sm" onClick={goToToday} className="font-semibold">
               {t.calendar.today}
             </Button>
-            <Button variant="ghost" size="icon" onClick={goToNextMonth} className="text-white hover:bg-white/20">
+            <Button variant="outline" size="icon" onClick={goToNextMonth}>
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setYear(year + 1)} className="text-white hover:bg-white/20">
+            <Button variant="outline" size="sm" onClick={() => setYear(year + 1)}>
               {t.calendar.nextYear}
             </Button>
           </div>
         </div>
-        <p className="text-white/70 text-sm mt-1">
+        <p className="text-muted-foreground text-sm mt-1">
           {getMonthNameByIndex(monthIndex)} 1 — {getMonthNameByIndex(monthIndex)} {daysInMonth}
         </p>
       </CardHeader>
       <CardContent className="p-4">
         <div className="grid grid-cols-7 gap-1 mb-2">
           {WEEKDAYS.map((day) => (
-            <div key={day} className="text-center text-xs font-semibold text-slate-500 py-2">
+            <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-2">
               {day}
             </div>
           ))}
@@ -118,19 +118,19 @@ export function PaymentCalendar({ payments }: PaymentCalendarProps) {
                   dayPayments.length > 0 ? "has-payment" : ""
                 } ${isToday ? "ring-2 ring-accent animate-pulse-glow" : ""}`}
               >
-                <div className={`text-xs font-semibold mb-1 ${isToday ? "text-accent" : "text-slate-600"}`}>
+                <div className={`text-xs font-semibold mb-1 ${isToday ? "text-card-foreground" : "text-muted-foreground"}`}>
                   {day}
                 </div>
                 <div className="space-y-0.5">
                   {dayPayments.map((cp) => (
                     <div
                       key={cp.payment.id}
-                      className="text-[10px] leading-tight bg-muted text-accent rounded px-1 py-0.5"
+                      className="text-[10px] leading-tight bg-muted text-card-foreground rounded px-1 py-0.5"
                       title={`${cp.payment.memberName} — ${cp.time} — ${formatCurrency(cp.payment.amount)}`}
                     >
                       <span className="font-semibold">{cp.payment.memberName.split(" ")[0]}</span>
                       <br />
-                      <span className="text-accent">{cp.time}</span>
+                      <span className="text-card-foreground">{cp.time}</span>
                     </div>
                   ))}
                 </div>
@@ -140,17 +140,17 @@ export function PaymentCalendar({ payments }: PaymentCalendarProps) {
         </div>
 
         {calendarPayments.length > 0 && (
-          <div className="mt-6 space-y-2 border-t border-slate-200 pt-4">
-            <h4 className="text-sm font-semibold text-slate-900">Faahfaahinta Bishan</h4>
+          <div className="mt-6 space-y-2 border-t border-border pt-4">
+            <h4 className="text-sm font-semibold text-card-foreground">Faahfaahinta Bishan</h4>
             {calendarPayments.map((cp) => (
-              <div key={cp.payment.id} className="flex items-center justify-between text-sm py-2 border-b border-slate-100 last:border-0">
+              <div key={cp.payment.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
                 <div>
-                  <span className="font-medium text-slate-900">{cp.payment.memberName}</span>
-                  <span className="text-slate-500">
+                  <span className="font-medium text-card-foreground">{cp.payment.memberName}</span>
+                  <span className="text-muted-foreground">
                     {" "}{t.calendar.paidOn} {cp.day} {getMonthNameByIndex(monthIndex)} {t.calendar.at} {cp.time}
                   </span>
                 </div>
-                <span className="font-mono-currency font-semibold text-accent">
+                <span className="font-mono-currency font-semibold text-card-foreground">
                   {formatCurrency(cp.payment.amount)}
                 </span>
               </div>

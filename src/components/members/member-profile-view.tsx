@@ -80,7 +80,7 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <>
       <Card>
         <CardHeader>
           <div className="flex items-center gap-4">
@@ -112,13 +112,13 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
             </div>
             <div className="flex-1 min-w-0">
               <CardTitle className="text-2xl">{member.name}</CardTitle>
-              <p className="text-sm text-slate-500">{getStatusLabel(member.status)}</p>
+              <p className="text-sm text-muted-foreground">{getStatusLabel(member.status)}</p>
               {isOwnProfile && member.avatarUrl && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="mt-1 h-7 px-2 text-xs text-slate-500"
+                  className="mt-1 h-7 px-2 text-xs text-muted-foreground"
                   disabled={uploadingPhoto}
                   onClick={handleRemovePhoto}
                 >
@@ -132,12 +132,12 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             {member.email && (
-              <p className="flex items-center gap-2"><Mail className="h-4 w-4 text-slate-400" />{member.email}</p>
+              <p className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" />{member.email}</p>
             )}
             {member.phone && (
-              <p className="flex items-center gap-2"><Phone className="h-4 w-4 text-slate-400" />{member.phone}</p>
+              <p className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" />{member.phone}</p>
             )}
-            <p className="flex items-center gap-2"><User className="h-4 w-4 text-slate-400" />{t.members.joinDate}: {new Date(member.joinDate).toLocaleDateString("so-SO")}</p>
+            <p className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" />{t.members.joinDate}: {new Date(member.joinDate).toLocaleDateString("so-SO")}</p>
             <p className="flex items-center gap-2"><Target className="h-4 w-4 text-gold" />{t.profile.annualTarget}: <CurrencyDisplay amount={stats.annualTarget} size="sm" /></p>
           </div>
 
@@ -145,34 +145,34 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
             <div className="flex items-center gap-3 p-4 rounded-xl bg-gold/10 border border-gold/30 text-sm">
               <AlertTriangle className="h-6 w-6 text-gold shrink-0" />
               <div>
-                <p className="font-semibold text-sky-700">{t.profile.lastWarning}</p>
-                <p className="text-slate-600">{t.profile.warningDesc}</p>
+                <p className="font-semibold text-card-foreground">{t.profile.lastWarning}</p>
+                <p className="text-muted-foreground">{t.profile.warningDesc}</p>
               </div>
             </div>
           )}
 
           {member.status === "removed" && (
-            <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+            <div className="p-4 rounded-xl bg-muted border border-border text-sm text-card-foreground">
               {t.profile.removedDesc}
             </div>
           )}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-3 rounded-xl bg-muted text-center">
-              <p className="text-xs text-slate-500">{t.members.totalPaid}</p>
-              <CurrencyDisplay amount={stats.totalPaid} size="sm" className="text-slate-900" />
+              <p className="text-xs text-muted-foreground">{t.members.totalPaid}</p>
+              <CurrencyDisplay amount={stats.totalPaid} size="sm" className="text-card-foreground" />
             </div>
             <div className="p-3 rounded-xl bg-muted text-center">
-              <p className="text-xs text-slate-500">{t.members.share}</p>
-              <p className="font-mono-currency font-bold text-slate-900">{stats.sharePercent.toFixed(1)}%</p>
+              <p className="text-xs text-muted-foreground">{t.members.share}</p>
+              <p className="font-mono-currency font-bold text-card-foreground">{stats.sharePercent.toFixed(1)}%</p>
             </div>
             <div className="p-3 rounded-xl bg-muted text-center">
-              <p className="text-xs text-slate-500">{t.profile.monthlyRequired}</p>
+              <p className="text-xs text-muted-foreground">{t.profile.monthlyRequired}</p>
               <CurrencyDisplay amount={stats.memberMonthlyFee} size="sm" />
             </div>
             <div className="p-3 rounded-xl bg-muted text-center">
-              <p className="text-xs text-slate-500">{t.members.debt}</p>
-              <CurrencyDisplay amount={stats.debt} size="sm" className={stats.debt > 0 ? "text-destructive" : "text-success"} />
+              <p className="text-xs text-muted-foreground">{t.members.debt}</p>
+              <CurrencyDisplay amount={stats.debt} size="sm" className="text-card-foreground" />
             </div>
           </div>
 
@@ -194,25 +194,25 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
           <CardContent className="space-y-3">
             <div className="max-h-48 overflow-y-auto space-y-2">
               {memberChats.length === 0 ? (
-                  <p className="text-sm text-slate-500">{t.profile.noChat}</p>
+                  <p className="text-sm text-muted-foreground">{t.profile.noChat}</p>
               ) : (
                 memberChats.map((c) => (
                   <div
                     key={c.id}
                     className={`p-3 rounded-xl text-sm max-w-[85%] ${
-                      c.fromAdmin ? "bg-brand/10 ml-auto text-right" : "bg-muted"
+                      c.fromAdmin ? "bg-muted border border-border ml-auto text-right" : "bg-muted"
                     }`}
                   >
                     <p>{c.message}</p>
                     <div className={`flex items-center gap-2 mt-1 ${c.fromAdmin ? "justify-end" : ""}`}>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                         {new Date(c.sentAt).toLocaleString("so-SO")}
                       </p>
                       {isAdmin && c.fromAdmin && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          className="h-6 w-6 text-card-foreground hover:text-card-foreground"
                           onClick={() => handleDeleteChat(c.id)}
                           title={t.profile.deleteChat}
                         >
@@ -236,6 +236,6 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
           </CardContent>
         </Card>
       )}
-    </div>
+    </>
   );
 }

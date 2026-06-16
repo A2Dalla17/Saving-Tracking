@@ -30,6 +30,7 @@ import {
   seedDefaultMembers,
 } from "@/lib/data-store";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { getConsecutiveMissedBefore } from "@/lib/calculations";
 import { resolveMemberStatus, shouldDeactivateLogin, getPayingMembers } from "@/lib/member-status";
 import type { Member, Payment, AppSettings, Announcement, ChatMessage, ArchivedMemberRecord } from "@/types";
@@ -60,6 +61,7 @@ const DataContext = createContext<DataContextValue | null>(null);
 const LOAD_TIMEOUT_MS = 5000;
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const hydrated = useHydrated();
   const { user, loading: authLoading } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -67,8 +69,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [chats, setChats] = useState<ChatMessage[]>([]);
   const [bin, setBin] = useState<ArchivedMemberRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
   const syncingRef = useRef(false);
+
+  const loading = !hydrated || authLoading || !dataReady;
 
   const syncMemberStatuses = useCallback(
     async (memberList: Member[], paymentList: Payment[], appSettings: AppSettings) => {
@@ -98,7 +102,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!hydrated || authLoading) return;
 
     let unsubMembers: (() => void) | undefined;
     let unsubPayments: (() => void) | undefined;
@@ -107,12 +111,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let unsubChats: (() => void) | undefined;
     let unsubBin: (() => void) | undefined;
 
-    const timeout = setTimeout(() => setLoading(false), LOAD_TIMEOUT_MS);
+    const timeout = setTimeout(() => setDataReady(true), LOAD_TIMEOUT_MS);
 
     const loadForLogin = () => {
       unsubMembers = subscribeMembers((data) => {
         setMembers(data);
-        setLoading(false);
+        setDataReady(true);
       });
     };
 
@@ -126,7 +130,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       const checkLoaded = () => {
         if (membersLoaded && paymentsLoaded && settingsLoaded && announcementsLoaded && chatsLoaded && binLoaded) {
-          setLoading(false);
+          setDataReady(true);
         }
       };
 
@@ -162,7 +166,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
     };
 
-    setLoading(true);
+    setDataReady(false);
 
     seedDefaultMembers()
       .then(() => {
@@ -174,7 +178,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         console.error("seed/load error:", err);
-        setLoading(false);
+        setDataReady(true);
       });
 
     return () => {
@@ -186,7 +190,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       unsubChats?.();
       unsubBin?.();
     };
-  }, [user, authLoading]);
+  }, [hydrated, user, authLoading]);
 
   useEffect(() => {
     if (!loading && members.length > 0 && user) {

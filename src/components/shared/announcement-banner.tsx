@@ -13,20 +13,23 @@ export function AnnouncementBanner() {
   if (visible.length === 0) return null;
 
   return (
-    <div className="space-y-2 mb-4">
+    <div className="space-y-2">
       {visible.map((a) => (
-        <div key={a.id} className="brand-gradient rounded-2xl p-4 text-white flex items-start gap-3 shadow-md animate-fade-in-up">
-          <Megaphone className="h-5 w-5 text-gold shrink-0 mt-0.5" />
+        <div
+          key={a.id}
+          className="surface-light bg-card border border-border rounded-2xl p-4 flex items-start gap-3 shadow-sm animate-fade-in-up"
+        >
+          <Megaphone className="h-5 w-5 text-card-foreground shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-medium">{a.message}</p>
-            <p className="text-xs text-white/60 mt-1">
+            <p className="text-sm font-medium text-card-foreground">{a.message}</p>
+            <p className="text-xs text-muted-foreground mt-1">
               {new Date(a.expiresAt).toLocaleString("so-SO")}
             </p>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="text-white hover:bg-white/20 shrink-0"
+            className="shrink-0"
             onClick={() => setDismissed([...dismissed, a.id])}
           >
             <X className="h-4 w-4" />

@@ -42,7 +42,7 @@ export function Sidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 border-r border-white/[0.08] bg-background">
+    <aside className="app-sidebar-fixed hidden lg:flex lg:flex-col lg:w-72 lg:inset-y-0 border-r border-white/[0.08] sidebar-surface surface-dark">
       <div className="flex items-center gap-4 px-6 py-6 border-b border-white/[0.08]">
         <div className="relative h-14 w-14 shrink-0">
           <Image src="/logo.png" alt="AC7 Group" fill className="object-contain" priority />
@@ -65,14 +65,14 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
                 isActive
-                  ? "bg-white/10 text-white shadow-sm"
+                  ? "bg-accent/15 text-white shadow-sm border border-accent/25"
                   : "text-white/60 hover:bg-white/[0.06] hover:text-white"
               )}
             >
               <Icon className="h-5 w-5" />
               {item.label}
               {item.protected && !isActive && (
-                <span className="ml-auto text-[10px] bg-accent/20 text-blue-200 px-2 py-0.5 rounded-md font-bold">PIN</span>
+                <span className="ml-auto text-[10px] bg-accent/20 text-accent-bright px-2 py-0.5 rounded-md font-bold">PIN</span>
               )}
             </Link>
           );
@@ -82,7 +82,7 @@ export function Sidebar() {
       <div className="px-4 py-4 border-t border-white/[0.08]">
         <button
           onClick={logout}
-          className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm text-white/70 hover:bg-white/10 hover:text-red-300 transition-colors"
+          className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors"
         >
           <LogOut className="h-5 w-5" />
           {t.login.logout}
@@ -107,7 +107,7 @@ export function MobileNav() {
 
   return (
     <>
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-header border-t border-white/10 pb-[env(safe-area-inset-bottom)]">
+      <nav className="app-mobile-nav-fixed lg:hidden bottom-0 left-0 right-0 glass-header surface-dark border-t border-white/10 pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center justify-around px-1 py-2">
           {primaryItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -156,7 +156,7 @@ export function MobileNav() {
                   onClick={() => setMoreOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium",
-                    isActive ? "bg-accent/10 text-accent" : "hover:bg-muted text-slate-700"
+                    isActive ? "bg-muted text-card-foreground font-semibold" : "hover:bg-muted text-card-foreground"
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -170,7 +170,7 @@ export function MobileNav() {
                 setMoreOpen(false);
                 logout();
               }}
-              className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm text-red-600 hover:bg-red-50"
+              className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm text-card-foreground hover:bg-muted"
             >
               <LogOut className="h-5 w-5" />
               {t.login.logout}
@@ -182,11 +182,16 @@ export function MobileNav() {
   );
 }
 
-export function LogoCorner() {
+export function LogoCorner({ showOnMobile = false }: { showOnMobile?: boolean }) {
   return (
-    <div className="fixed top-4 right-4 z-40 hidden md:block safe-top">
-      <div className="relative h-16 w-16 opacity-90 hover:opacity-100 transition-opacity drop-shadow-lg">
-        <Image src="/logo.png" alt="AC7" fill className="object-contain" />
+    <div
+      className={cn(
+        "logo-corner-fixed top-4 right-4 sm:top-6 sm:right-6 safe-top",
+        showOnMobile ? "block" : "hidden lg:block"
+      )}
+    >
+      <div className="relative h-16 w-16 sm:h-20 sm:w-20 opacity-90 hover:opacity-100 transition-opacity drop-shadow-lg">
+        <Image src="/logo.png" alt="AC7" fill className="object-contain" priority />
       </div>
     </div>
   );

@@ -53,7 +53,7 @@ export function AdminBin() {
               <div key={record.id} className="rounded-xl border border-border p-4 space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-slate-900">{record.member.name}</p>
+                    <p className="font-semibold text-card-foreground">{record.member.name}</p>
                     <p className="text-sm text-muted-foreground">{record.member.email ?? record.member.phone ?? "—"}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {t.admin.archivedAt}: {formatDateTime(record.archivedAt)}

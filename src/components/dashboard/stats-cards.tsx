@@ -15,7 +15,7 @@ const cards = [
     key: "totalSavings" as const,
     label: t.dashboard.totalSavings,
     icon: PiggyBank,
-    color: "text-accent",
+    color: "text-card-foreground",
     bg: "bg-muted",
     getValue: (s: GroupStats) => s.totalSavings,
   },
@@ -23,15 +23,15 @@ const cards = [
     key: "totalDebt" as const,
     label: t.dashboard.totalDebt,
     icon: AlertTriangle,
-    color: "text-red-600",
-    bg: "bg-red-50",
+    color: "text-card-foreground",
+    bg: "bg-muted",
     getValue: (s: GroupStats) => s.totalDebt,
   },
   {
     key: "members" as const,
     label: t.dashboard.members,
     icon: Users,
-    color: "text-brand",
+    color: "text-card-foreground",
     bg: "bg-muted",
     getValue: (s: GroupStats) => s.memberCount,
     isCount: true,
@@ -40,7 +40,7 @@ const cards = [
     key: "goal" as const,
     label: t.dashboard.groupGoal,
     icon: Target,
-    color: "text-accent",
+    color: "text-card-foreground",
     bg: "bg-muted",
     getValue: (s: GroupStats) => s.groupGoal,
     isGoal: true,
@@ -62,16 +62,16 @@ export function StatsCards({ stats }: StatsCardsProps) {
             <CardContent className="p-5 sm:p-6">
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-2 min-w-0">
-                  <p className="text-sm text-slate-500 font-medium">{card.label}</p>
+                  <p className="text-sm text-muted-foreground font-medium">{card.label}</p>
                   {card.isCount ? (
-                    <p className="font-mono-currency text-2xl sm:text-3xl font-bold text-slate-900">{value}</p>
+                    <p className="font-mono-currency text-2xl sm:text-3xl font-bold text-card-foreground">{value}</p>
                   ) : card.isGoal ? (
                     <div>
-                      <CurrencyDisplay amount={value as number} size="lg" className="text-slate-900" />
-                      <p className="text-xs text-slate-500 mt-1">{stats.goalProgress.toFixed(0)}% gaaray</p>
+                      <CurrencyDisplay amount={value as number} size="lg" className="text-card-foreground" />
+                      <p className="text-xs text-muted-foreground mt-1">{stats.goalProgress.toFixed(0)}% gaaray</p>
                     </div>
                   ) : (
-                    <CurrencyDisplay amount={value as number} size="lg" className="text-slate-900" />
+                    <CurrencyDisplay amount={value as number} size="lg" className="text-card-foreground" />
                   )}
                 </div>
                 <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${card.bg}`}>

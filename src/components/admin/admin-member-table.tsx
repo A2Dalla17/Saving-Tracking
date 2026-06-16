@@ -201,7 +201,7 @@ export function AdminMemberTable() {
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <div>
           <CardTitle>{t.admin.memberTable}</CardTitle>
-          <p className="text-xs text-slate-500 mt-1">{t.admin.loginSetupHint}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t.admin.loginSetupHint}</p>
         </div>
         <Button size="sm" onClick={handleAdd}>
           <Plus className="h-4 w-4" />
@@ -211,7 +211,7 @@ export function AdminMemberTable() {
       <CardContent className="overflow-x-auto">
         <table className="w-full text-sm min-w-[1050px]">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-slate-500">
+            <tr className="border-b border-border text-left text-muted-foreground">
               <th className="py-2 px-2">{t.members.name}</th>
               <th className="py-2 px-2">{t.admin.loginId}</th>
               <th className="py-2 px-2">{t.admin.newPassword}</th>
@@ -224,7 +224,7 @@ export function AdminMemberTable() {
           </thead>
           <tbody>
             {editMembers.map((m) => (
-              <tr key={m.id} className="border-b border-slate-100 text-slate-800">
+              <tr key={m.id} className="border-b border-border text-card-foreground">
                 <td className="py-2 px-2">
                   <Input
                     value={m.name}
@@ -246,7 +246,7 @@ export function AdminMemberTable() {
                 </td>
                 <td className="py-2 px-2">
                   {isAdminMember(m) ? (
-                    <span className="text-xs text-slate-400">—</span>
+                    <span className="text-xs text-muted-foreground">—</span>
                   ) : (
                     <Input
                       type="password"
@@ -271,7 +271,7 @@ export function AdminMemberTable() {
                 </td>
                 <td className="py-2 px-2">
                   {isAdminMember(m) ? (
-                    <span className="text-xs text-slate-400">—</span>
+                    <span className="text-xs text-muted-foreground">—</span>
                   ) : (
                     <Input
                       type="number"
@@ -303,7 +303,7 @@ export function AdminMemberTable() {
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDelete(m.id)}
-                      className="text-destructive"
+                      className="text-card-foreground"
                       disabled={isAdminMember(m)}
                     >
                       <Trash2 className="h-4 w-4" />

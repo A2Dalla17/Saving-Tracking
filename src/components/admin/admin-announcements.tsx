@@ -42,7 +42,7 @@ export function AdminAnnouncements() {
         <div className="space-y-2">
           <Label>{t.announcements.message}</Label>
           <textarea
-            className="flex w-full rounded-xl border border-border bg-card text-slate-900 px-4 py-3 text-sm min-h-[100px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent placeholder:text-slate-400"
+            className="flex w-full rounded-xl border border-border bg-[var(--input-bg)] text-card-foreground px-4 py-3 text-sm min-h-[100px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent placeholder:text-muted-foreground"
             placeholder={t.announcements.placeholder}
             value={message}
             onChange={(e) => setMessage(e.target.value)}

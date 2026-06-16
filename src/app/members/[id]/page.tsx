@@ -1,9 +1,10 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { MemberProfileView } from "@/components/members/member-profile-view";
 import { useData } from "@/lib/hooks/use-data";
+import { PageLoading, PageStatus } from "@/components/shared/page-status";
 import { t } from "@/lib/somali";
 
 export default function MemberProfilePage() {
@@ -12,17 +13,26 @@ export default function MemberProfilePage() {
   const member = members.find((m) => m.id === id);
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[60vh]"><p className="text-muted-foreground">{t.common.loading}</p></div>;
+    return (
+      <PageLayout title={t.profile.title}>
+        <PageLoading />
+      </PageLayout>
+    );
   }
 
   if (!member) {
-    return <div className="text-center py-20 text-muted-foreground">{t.profile.notFound}</div>;
+    return (
+      <PageLayout title={t.profile.title}>
+        <div className="py-12 text-center">
+          <PageStatus message={t.profile.notFound} />
+        </div>
+      </PageLayout>
+    );
   }
 
   return (
-    <div>
-      <PageHeader title={t.profile.title} subtitle={member.name} />
+    <PageLayout title={t.profile.title} subtitle={member.name}>
       <MemberProfileView member={member} />
-    </div>
+    </PageLayout>
   );
 }

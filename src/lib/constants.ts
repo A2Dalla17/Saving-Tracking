@@ -1,4 +1,6 @@
-export const BRAND_COLOR = "#030337";
+export const BRAND_COLOR = "#0a1628";
+export const BACKGROUND_COLOR = "#0a1628";
+export const WHITE_COLOR = "#ffffff";
 export const MONTHLY_FEE = 55;
 export const GROUP_START_DATE = new Date(2026, 5, 1);
 export const ADMIN_PIN = "1596";

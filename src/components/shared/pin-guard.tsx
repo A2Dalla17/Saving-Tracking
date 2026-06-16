@@ -9,17 +9,25 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAdmin } from "@/lib/hooks/use-admin";
 import { useData } from "@/lib/hooks/use-data";
+import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { ADMIN_EMAIL, MAX_PIN_ATTEMPTS } from "@/lib/constants";
 import { t } from "@/lib/somali";
-import Image from "next/image";
 
 interface PinGuardProps {
   children: React.ReactNode;
-  title?: string;
   description?: string;
 }
 
-export function PinGuard({ children, title, description }: PinGuardProps) {
+function PinGuardShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="pin-guard-shell flex w-full flex-col items-center justify-center min-h-[min(52vh,520px)] py-8">
+      {children}
+    </div>
+  );
+}
+
+export function PinGuard({ children, description }: PinGuardProps) {
+  const hydrated = useHydrated();
   const { isUnlocked, unlock, failedAttempts, isLocked, unlockWithRecovery, requestRecovery, lock } = useAdmin();
   const { settings } = useData();
   const [pin, setPin] = useState("");
@@ -32,6 +40,14 @@ export function PinGuard({ children, title, description }: PinGuardProps) {
   useEffect(() => {
     return () => lock();
   }, [lock]);
+
+  if (!hydrated) {
+    return (
+      <PinGuardShell>
+        <p className="text-muted-foreground">{t.common.loading}</p>
+      </PinGuardShell>
+    );
+  }
 
   if (isUnlocked) return <>{children}</>;
 
@@ -79,86 +95,79 @@ export function PinGuard({ children, title, description }: PinGuardProps) {
 
   if (isLocked || showRecovery) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="w-full max-w-md animate-fade-in-up">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 relative h-16 w-16">
-              <Image src="/logo.png" alt="AC7" fill className="object-contain" />
-            </div>
-            <CardTitle>{t.recovery.title}</CardTitle>
-            <CardDescription>
-              {t.recovery.desc} <strong>{ADMIN_EMAIL}</strong>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button onClick={handleSendRecovery} variant="outline" className="w-full" disabled={sendingRecovery}>
-              {sendingRecovery ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              {t.recovery.sendCode}
-            </Button>
-            <div className="space-y-2">
-              <Label htmlFor="recovery">{t.recovery.enterCode}</Label>
-              <Input
-                id="recovery"
-                placeholder="123456"
-                maxLength={6}
-                value={recoveryCode}
-                onChange={(e) => {
-                  setRecoveryCode(e.target.value);
-                  setError("");
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleVerifyRecovery()}
-              />
-              {error && <p className="text-sm text-destructive">{error}</p>}
-            </div>
-            <Button onClick={handleVerifyRecovery} className="w-full" disabled={verifyingRecovery}>
-              {verifyingRecovery ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-              {t.recovery.verify}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <PinGuardShell>
+      <Card className="w-full max-w-md animate-fade-in-up">
+        <CardHeader>
+          <CardTitle>{t.recovery.title}</CardTitle>
+          <CardDescription>
+            {t.recovery.desc} <strong>{ADMIN_EMAIL}</strong>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button onClick={handleSendRecovery} variant="outline" className="w-full" disabled={sendingRecovery}>
+            {sendingRecovery ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+            {t.recovery.sendCode}
+          </Button>
+          <div className="space-y-2">
+            <Label htmlFor="recovery">{t.recovery.enterCode}</Label>
+            <Input
+              id="recovery"
+              placeholder="123456"
+              maxLength={6}
+              value={recoveryCode}
+              onChange={(e) => {
+                setRecoveryCode(e.target.value);
+                setError("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleVerifyRecovery()}
+            />
+            {error && <p className="text-sm text-card-foreground">{error}</p>}
+          </div>
+          <Button onClick={handleVerifyRecovery} className="w-full" disabled={verifyingRecovery}>
+            {verifyingRecovery ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+            {t.recovery.verify}
+          </Button>
+        </CardContent>
+      </Card>
+      </PinGuardShell>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="w-full max-w-md animate-fade-in-up">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 relative h-16 w-16">
-            <Image src="/logo.png" alt="AC7" fill className="object-contain" />
-          </div>
-          <CardTitle>{title ?? t.admin.title}</CardTitle>
-          <CardDescription>{description ?? t.admin.desc}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="pin">{t.ledger.enterPin}</Label>
-            <Input
-              id="pin"
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              placeholder={t.ledger.pinPlaceholder}
-              value={pin}
-              onChange={(e) => {
-                setPin(e.target.value);
-                setError("");
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
-            />
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {failedAttempts > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {MAX_PIN_ATTEMPTS - failedAttempts} isku day oo haray
-              </p>
-            )}
-          </div>
-          <Button onClick={handleUnlock} className="w-full">
-            <ShieldCheck className="h-4 w-4" />
-            {t.ledger.unlock}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <PinGuardShell>
+    <Card className="w-full max-w-md animate-fade-in-up">
+      <CardHeader>
+        <CardDescription>{description ?? t.admin.desc}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="pin">{t.ledger.enterPin}</Label>
+          <Input
+            id="pin"
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            placeholder={t.ledger.pinPlaceholder}
+            value={pin}
+            onChange={(e) => {
+              setPin(e.target.value);
+              setError("");
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
+          />
+          {error && <p className="text-sm text-card-foreground">{error}</p>}
+          {failedAttempts > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {MAX_PIN_ATTEMPTS - failedAttempts} isku day oo haray
+            </p>
+          )}
+        </div>
+        <Button onClick={handleUnlock} className="w-full">
+          <ShieldCheck className="h-4 w-4" />
+          {t.ledger.unlock}
+        </Button>
+      </CardContent>
+    </Card>
+    </PinGuardShell>
   );
 }

@@ -30,35 +30,35 @@ export function SavingsChart({ data }: SavingsChartProps) {
             <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#243041" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#243041" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(36,48,65,0.08)" />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 12, fill: "#64748b" }}
-                axisLine={{ stroke: "#cbd5e1" }}
+                tick={{ fontSize: 12, fill: "#243041" }}
+                axisLine={{ stroke: "rgba(36,48,65,0.15)" }}
               />
               <YAxis
-                tick={{ fontSize: 12, fill: "#64748b" }}
-                axisLine={{ stroke: "#cbd5e1" }}
+                tick={{ fontSize: 12, fill: "#243041" }}
+                axisLine={{ stroke: "rgba(36,48,65,0.15)" }}
                 tickFormatter={(v) => `$${v}`}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#f7f2ea",
-                  border: "1px solid #e0d6c8",
+                  backgroundColor: "#eceff3",
+                  border: "1px solid rgba(36,48,65,0.12)",
+                  color: "#243041",
                   borderRadius: "12px",
-                  color: "#1e293b",
-                  fontFamily: "monospace",
+                  fontFamily: "Roboto, Segoe UI, sans-serif",
                 }}
                 formatter={(value) => [formatCurrency(Number(value)), "Kaydka"]}
               />
               <Area
                 type="monotone"
                 dataKey="savings"
-                stroke="#2563eb"
+                stroke="#243041"
                 strokeWidth={3}
                 fill="url(#savingsGradient)"
               />

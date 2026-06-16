@@ -68,7 +68,7 @@ export function PaymentTable() {
   if (payingMembers.length === 0) {
     return (
       <Card>
-        <CardContent className="p-12 text-center text-slate-500">
+        <CardContent className="p-12 text-center text-muted-foreground">
           {t.members.noMembers}
         </CardContent>
       </Card>
@@ -83,36 +83,36 @@ export function PaymentTable() {
         <CardTitle>
           {currentMonth} — {t.ledger.month}
         </CardTitle>
-        {allPaid && <p className="text-sm text-success font-medium">{t.ledger.allPaid}</p>}
+        {allPaid && <p className="text-sm text-card-foreground font-medium">{t.ledger.allPaid}</p>}
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">{t.ledger.member}</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">{t.ledger.status}</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">{t.ledger.amount}</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">{t.ledger.action}</th>
+              <tr className="border-b border-border">
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{t.ledger.member}</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{t.ledger.status}</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{t.ledger.amount}</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">{t.ledger.action}</th>
               </tr>
             </thead>
             <tbody>
               {memberStatsList.map((ms) => (
                 <tr key={ms.member.id} className="border-b border-border hover:bg-muted transition-colors">
                   <td className="py-4 px-4">
-                    <span className="font-medium text-slate-900">{ms.member.name}</span>
+                    <span className="font-medium text-card-foreground">{ms.member.name}</span>
                     {ms.consecutiveMissed > 0 && !ms.isCurrentMonthPaid && (
-                      <span className="block text-xs text-destructive">{t.ledger.escalated}</span>
+                      <span className="block text-xs text-card-foreground">{t.ledger.escalated}</span>
                     )}
                   </td>
                   <td className="py-4 px-4">
                     {ms.isCurrentMonthPaid ? (
-                      <span className="inline-flex items-center gap-1.5 text-sm text-success">
+                      <span className="inline-flex items-center gap-1.5 text-sm text-card-foreground">
                         <CheckCircle2 className="h-4 w-4" />
                         {t.members.paid}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-sm text-destructive">
+                      <span className="inline-flex items-center gap-1.5 text-sm text-card-foreground">
                         <XCircle className="h-4 w-4" />
                         {t.members.unpaid}
                       </span>
@@ -129,16 +129,16 @@ export function PaymentTable() {
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-muted-foreground min-w-[52px]">{t.ledger.nextMonth}:</span>
-                          <CurrencyDisplay amount={ms.nextMonthDue} size="sm" className="text-destructive" />
+                          <CurrencyDisplay amount={ms.nextMonthDue} size="sm" className="text-card-foreground" />
                         </div>
                         {settings.lateFeeEscalation && ms.consecutiveMissed === 0 && (
-                          <p className="text-xs text-destructive font-medium">
+                          <p className="text-xs text-card-foreground font-medium">
                             {formatCurrency(ms.memberMonthlyFee)} + {formatCurrency(ms.memberMonthlyFee)} = {formatCurrency(ms.nextMonthDue)}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">{t.ledger.feeDoubleHint}</p>
                         {ms.consecutiveMissed > 0 && (
-                          <p className="text-xs text-destructive">
+                          <p className="text-xs text-card-foreground">
                             {t.ledger.escalated} — {t.ledger.thisMonth}: {formatCurrency(ms.currentMonthDue)}
                           </p>
                         )}
@@ -150,7 +150,7 @@ export function PaymentTable() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                        className="text-card-foreground border-border hover:bg-muted"
                         onClick={() => handleUndoPayment(ms.member.id, ms.member.name)}
                       >
                         <Undo2 className="h-4 w-4" />

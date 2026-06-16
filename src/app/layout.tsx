@@ -1,23 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, IBM_Plex_Mono, Inter } from "next/font/google";
+import { Roboto } from "next/font/google";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-bricolage",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-ibm-plex",
+const roboto = Roboto({
+  variable: "--font-roboto",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-});
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -37,7 +27,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#030337",
+  themeColor: "#0a1628",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -49,8 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="so">
-      <body className={`${bricolage.variable} ${ibmPlexMono.variable} ${inter.variable} antialiased`}>
+    <html lang="so" suppressHydrationWarning>
+      <body
+        suppressHydrationWarning
+        className={`${roboto.variable} antialiased`}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>
