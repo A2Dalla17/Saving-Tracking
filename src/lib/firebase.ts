@@ -2,7 +2,13 @@
 
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth as createAuth, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  getFirestore,
+  memoryLocalCache,
+  enableNetwork,
+  type Firestore,
+} from "firebase/firestore";
 import { firebasePublicConfig as firebaseConfig } from "@/lib/firebase-public-config";
 
 export { firebasePublicConfig, firebasePublicConfig as firebaseConfig } from "@/lib/firebase-public-config";
@@ -10,13 +16,53 @@ export { firebasePublicConfig, firebasePublicConfig as firebaseConfig } from "@/
 let app: FirebaseApp | undefined;
 let authInstance: Auth | undefined;
 let dbInstance: Firestore | undefined;
+let networkReady: Promise<void> | undefined;
+
+const FIRESTORE_SETTINGS = {
+  localCache: memoryLocalCache(),
+  experimentalAutoDetectLongPolling: true,
+  experimentalForceLongPolling: true,
+} as const;
 
 function initFirebaseClient(): void {
   if (typeof window === "undefined") return;
-  if (app) return;
-  app = getApps().find((a) => a.name === "[DEFAULT]") ?? initializeApp(firebaseConfig);
-  authInstance = createAuth(app);
-  dbInstance = getFirestore(app);
+
+  if (!app) {
+    app = getApps().find((a) => a.name === "[DEFAULT]") ?? initializeApp(firebaseConfig);
+    authInstance = createAuth(app);
+  }
+
+  if (!dbInstance) {
+    try {
+      dbInstance = initializeFirestore(app, FIRESTORE_SETTINGS);
+    } catch {
+      // Hot reload — reuse instance created earlier in this session.
+      dbInstance = getFirestore(app);
+    }
+    networkReady = enableNetwork(dbInstance)
+      .then(() => {
+        console.log("Firebase Firestore online:", firebaseConfig.projectId);
+      })
+      .catch((err) => {
+        console.warn("Firestore enableNetwork warning:", err);
+      });
+  }
+}
+
+/** Ensure Firestore network transport is active before server reads/writes. */
+export async function ensureFirestoreOnline(): Promise<void> {
+  initFirebaseClient();
+  if (!dbInstance) {
+    throw new Error("Firestore is only available in the browser");
+  }
+  if (networkReady) {
+    await networkReady;
+  }
+  try {
+    await enableNetwork(dbInstance);
+  } catch (err) {
+    console.warn("ensureFirestoreOnline:", err);
+  }
 }
 
 /** Firebase Auth — browser only. */

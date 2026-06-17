@@ -1,4 +1,5 @@
 import type { Member, MemberStatus, Payment } from "@/types";
+import { paymentBelongsToMember } from "./calculations";
 import { ADMIN_EMAIL, ADMIN_FIREBASE_EMAIL, REMOVAL_MISS_THRESHOLD, WARNING_MISS_THRESHOLD } from "./constants";
 
 export function isAdminMember(member: Member): boolean {
@@ -14,8 +15,8 @@ export function getPayingMembers(members: Member[]): Member[] {
 }
 
 export function filterPayingPayments(members: Member[], payments: Payment[]): Payment[] {
-  const payingIds = new Set(getPayingMembers(members).map((m) => m.id));
-  return payments.filter((p) => payingIds.has(p.memberId));
+  const payingMembers = getPayingMembers(members);
+  return payments.filter((p) => payingMembers.some((m) => paymentBelongsToMember(p, m)));
 }
 
 export function resolveMemberStatus(consecutiveMissed: number): MemberStatus {

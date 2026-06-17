@@ -9,8 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { isAdminEmail, isAdminLoginIdentifier } from "@/lib/auth";
 import { resolveProfileMember } from "@/lib/resolve-profile-member";
 import {
@@ -90,6 +91,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, [hydrated]);
 
+  // Keep session in sync with Firebase Auth (same account on every device).
+  useEffect(() => {
+    if (!hydrated) return;
+
+    const unsubscribe = onAuthStateChanged(auth(), (firebaseUser) => {
+      if (!firebaseUser) return;
+
+      setUser((current) => {
+        const base =
+          current ??
+          buildAuthUserFromFirebase(
+            firebaseUser.email ?? "",
+            firebaseUser.uid,
+            firebaseUser.email ?? "",
+            firebaseUser.displayName
+          );
+
+        const next: AuthUser = {
+          ...base,
+          memberId: firebaseUser.uid,
+          email: firebaseUser.email ?? base.email,
+          name: firebaseUser.displayName?.trim() || base.name,
+          isAdmin:
+            base.isAdmin ||
+            isAdminEmail(firebaseUser.email ?? "") ||
+            isAdminLoginIdentifier(firebaseUser.email ?? ""),
+        };
+
+        const same =
+          next.memberId === base.memberId &&
+          next.email === base.email &&
+          next.name === base.name;
+        if (!same || !current) {
+          persistUser(next);
+        }
+        return next;
+      });
+    });
+
+    return () => unsubscribe();
+  }, [hydrated]);
+
   const loading = !hydrated || !ready;
 
   const login = useCallback(async (identifier: string, password: string) => {
@@ -105,6 +148,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const credential = adminLogin
         ? await signInAdminWithFirebase(identifier, trimmedPassword)
         : await signInWithEmailAndPassword(auth(), email, trimmedPassword);
+
+      if (!adminLogin) {
+        const memberSnap = await getDoc(doc(db(), "members", credential.user.uid));
+        if (!memberSnap.exists()) {
+          await signOut(auth());
+          return { success: false, error: "auth/account-removed: Xubintaada waa la saaray — la xiriir admin-ka" };
+        }
+        const memberData = memberSnap.data();
+        if (memberData.login_active === false || memberData.status === "removed") {
+          await signOut(auth());
+          return { success: false, error: "auth/account-disabled: Login-kaaga waa la xiray" };
+        }
+      }
 
       const authUser = buildAuthUserFromFirebase(
         identifier,

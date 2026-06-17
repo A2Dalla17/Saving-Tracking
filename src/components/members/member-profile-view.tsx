@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, User, Mail, Phone, Target, Camera, X } from "lucide-react";
+import { AlertTriangle, User, Mail, Phone, Target, Camera, X, CheckCircle2, XCircle, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -10,7 +10,7 @@ import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { useData } from "@/lib/hooks/use-data";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { calculateMemberStats, calculateGroupStats } from "@/lib/calculations";
+import { calculateMemberStats, calculateGroupStats, getMonthName, formatCurrency, getLastMemberPayment } from "@/lib/calculations";
 import { getStatusLabel } from "@/lib/member-status";
 import { processProfileImage } from "@/lib/avatar";
 import { GroupAdminChat } from "@/components/shared/group-admin-chat";
@@ -22,13 +22,19 @@ interface MemberProfileViewProps {
 }
 
 export function MemberProfileView({ member }: MemberProfileViewProps) {
-  const { payments, settings, editMember } = useData();
+  const { members, payments, settings, editMember } = useData();
   const { user } = useAuth();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const syncedInFirestore = members.some(
+    (m) => m.id === member.id || m.uid === member.uid || m.uid === member.id
+  );
+
   const groupStats = calculateGroupStats([member], payments, settings);
   const stats = calculateMemberStats(member, payments, groupStats.totalSavings, settings);
+  const lastPayment = getLastMemberPayment(payments, member);
+  const currentMonth = getMonthName();
   const isOwnProfile =
     user?.memberId === member.id ||
     user?.memberId === member.uid ||
@@ -70,7 +76,7 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
           <div className="flex items-center gap-4">
             <div className="relative shrink-0">
               <MemberAvatar member={member} size="md" />
-              {isOwnProfile && (
+              {isOwnProfile && syncedInFirestore && (
                 <>
                   <input
                     ref={fileInputRef}
@@ -97,7 +103,7 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
             <div className="flex-1 min-w-0">
               <CardTitle className="text-2xl">{member.name}</CardTitle>
               <p className="text-sm text-muted-foreground">{getStatusLabel(member.status)}</p>
-              {isOwnProfile && member.avatarUrl && (
+              {isOwnProfile && syncedInFirestore && member.avatarUrl && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -158,6 +164,51 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
               <p className="text-xs text-muted-foreground">{t.members.debt}</p>
               <CurrencyDisplay amount={stats.debt} size="sm" className="text-card-foreground" />
             </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-muted border border-border space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-sm font-medium">{currentMonth} — {t.profile.currentMonth}</p>
+              {stats.isCurrentMonthPaid ? (
+                <span className="inline-flex items-center gap-1.5 text-sm text-card-foreground">
+                  <CheckCircle2 className="h-4 w-4" />
+                  {t.profile.paidThisMonth}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-sm text-card-foreground">
+                  <XCircle className="h-4 w-4" />
+                  {t.profile.unpaidThisMonth}
+                </span>
+              )}
+            </div>
+            {!stats.isCurrentMonthPaid && (
+              <div className="text-sm space-y-1">
+                <p className="text-muted-foreground">
+                  {t.ledger.thisMonth}: <CurrencyDisplay amount={stats.currentMonthDue} size="sm" />
+                </p>
+                <p className="text-card-foreground font-medium">
+                  {t.profile.nextMonthDue}: <CurrencyDisplay amount={stats.nextMonthDue} size="sm" />
+                  {stats.consecutiveMissed === 0 && settings.lateFeeEscalation && (
+                    <span className="text-muted-foreground font-normal ml-1">
+                      ({formatCurrency(stats.memberMonthlyFee)} + {formatCurrency(stats.memberMonthlyFee)})
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">{t.ledger.feeDoubleHint}</p>
+              </div>
+            )}
+            {lastPayment && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" />
+                {t.profile.lastPayment}: {new Date(lastPayment.paidAt).toLocaleDateString("so-SO", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+                {" · "}
+                <CurrencyDisplay amount={lastPayment.amount} size="sm" />
+              </p>
+            )}
           </div>
 
           <div>

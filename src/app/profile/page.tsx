@@ -11,9 +11,9 @@ import { t } from "@/lib/somali";
 export default function ProfilePage() {
   const { members, loading } = useData();
   const { user } = useAuth();
-  const member = resolveProfileMember(members, user);
+  const member = user ? resolveProfileMember(members, user) : undefined;
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <PageLayout title={t.nav.profile} subtitle={t.profile.myProfile}>
         <PageLoading />

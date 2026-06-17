@@ -5,16 +5,17 @@ import {
   doc,
   getDocs,
   getDoc,
+  addDoc,
   setDoc,
   updateDoc,
   deleteDoc,
   query,
   orderBy,
+  limit,
   onSnapshot,
   writeBatch,
-  getCountFromServer,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, ensureFirestoreOnline } from "@/lib/firebase";
 import { isFirebaseConfigured } from "./firestore-config";
 import {
   rowToMember,
@@ -42,6 +43,7 @@ import {
 } from "./constants";
 import { hashPassword } from "./auth";
 import { isAdminMember } from "./member-status";
+import { isCurrentMonthPaid, paymentBelongsToMember, findCurrentMonthPayment, getCurrentMonthKey, formatMonthKey } from "./calculations";
 import { createMemberFirebaseAuth, isValidMemberLoginId, loginIdToEmail, normalizeLoginId } from "./member-auth";
 import { ensureAdminFirebaseSession } from "./admin-firebase-auth";
 import { generateId } from "./utils";
@@ -55,35 +57,121 @@ function requireFirestore(): void {
   }
 }
 
-/** Best-effort admin Firebase sign-in (needed when security rules require auth). */
+/** Sign in admin Firebase account before writes (rules may require auth in production). */
 async function ensureFirestoreWriteAccess(): Promise<void> {
   requireFirestore();
-  await ensureAdminFirebaseSession();
+  await ensureFirestoreOnline();
+  const result = await ensureAdminFirebaseSession();
+  if (!result.success) {
+    console.warn("Admin Firebase session unavailable, attempting Firestore write anyway:", result.error);
+  }
+}
+
+async function collectionHasDocuments(collectionName: string): Promise<boolean> {
+  await ensureFirestoreOnline();
+  const snapshot = await getDocs(query(collection(db(), collectionName), limit(1)));
+  return !snapshot.empty;
+}
+
+async function firestoreAddMember(data: Record<string, unknown>): Promise<string> {
+  console.log("Writing to Firestore", data);
+  try {
+    await ensureFirestoreWriteAccess();
+    const ref = await addDoc(collection(db(), "members"), data);
+    console.log("Firestore success", ref.id);
+    return ref.id;
+  } catch (err) {
+    console.error("Firestore FAILED", err);
+    throw err;
+  }
+}
+
+async function firestoreSetMemberByUid(uid: string, data: Record<string, unknown>): Promise<string> {
+  console.log("Writing to Firestore", { id: uid, ...data });
+  try {
+    await ensureFirestoreWriteAccess();
+    await setDoc(doc(db(), "members", uid), data);
+    console.log("Firestore success", uid);
+    return uid;
+  } catch (err) {
+    console.error("Firestore FAILED", err);
+    throw err;
+  }
+}
+
+async function createMemberViaServerApi(input: {
+  name: string;
+  loginId: string;
+  password: string;
+  contribution: number;
+}): Promise<{ id: string; uid: string } | null> {
+  try {
+    const res = await fetch("/api/members/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      console.warn("Server member create failed:", data.error ?? res.status);
+      return null;
+    }
+    const data = (await res.json()) as { id: string; uid: string };
+    console.log("Server created Auth + Firestore member:", data.id);
+    return data;
+  } catch (err) {
+    console.warn("Server member create unavailable:", err);
+    return null;
+  }
+}
+
+async function firestoreUpdateMemberDoc(
+  memberId: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  console.log("Writing to Firestore", { id: memberId, ...data });
+  try {
+    await ensureFirestoreWriteAccess();
+    await updateDoc(doc(db(), "members", memberId), data);
+    console.log("Firestore success", memberId);
+  } catch (err) {
+    console.error("Firestore FAILED", err);
+    throw err;
+  }
 }
 
 function mapCollectionSnapshot<T>(
   snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] },
   mapRow: (row: Record<string, unknown>) => T
 ): T[] {
-  return snapshot.docs.map((snap) => mapRow({ id: snap.id, ...snap.data() }));
+  return snapshot.docs.map((snap) => mapRow({ ...snap.data(), id: snap.id }));
 }
 
 async function fetchAllMembers(): Promise<Member[]> {
   if (!isFirebaseConfigured()) return [];
-  const snapshot = await getDocs(query(collection(db(), "members"), orderBy("created_at", "desc")));
-  return snapshot.docs.map((snap) => normalizeMember(rowToMember({ id: snap.id, ...snap.data() })));
+  await ensureFirestoreOnline();
+  const snapshot = await getDocs(collection(db(), "members"));
+  return snapshot.docs
+    .map((snap) => normalizeMember(rowToMember({ id: snap.id, ...snap.data() })))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 async function fetchAllPayments(): Promise<Payment[]> {
   if (!isFirebaseConfigured()) return [];
   const snapshot = await getDocs(query(collection(db(), "payments"), orderBy("paid_at", "desc")));
-  return snapshot.docs.map((snap) => rowToPayment({ id: snap.id, ...snap.data() }));
+  return snapshot.docs.map((snap) => rowToPayment({ ...snap.data(), id: snap.id }));
 }
 
 async function fetchSettingsRow(): Promise<AppSettings> {
   if (!isFirebaseConfigured()) return DEFAULT_SETTINGS;
-  const snapshot = await getDoc(doc(db(), "app_settings", "app"));
-  return snapshot.exists() ? rowToSettings({ id: snapshot.id, ...snapshot.data() }) : DEFAULT_SETTINGS;
+  try {
+    await ensureFirestoreOnline();
+    const snapshot = await getDoc(doc(db(), "app_settings", "app"));
+    return snapshot.exists() ? rowToSettings({ id: snapshot.id, ...snapshot.data() }) : DEFAULT_SETTINGS;
+  } catch (err) {
+    console.warn("fetchSettingsRow fallback to defaults:", err);
+    return DEFAULT_SETTINGS;
+  }
 }
 
 async function fetchAnnouncements(): Promise<Announcement[]> {
@@ -111,8 +199,9 @@ async function syncSavingsFromPayments(): Promise<void> {
   if (!isFirebaseConfigured()) return;
 
   try {
-    const countSnapshot = await getCountFromServer(collection(db(), "savings"));
-    if (countSnapshot.data().count > 0) return;
+    await ensureFirestoreOnline();
+    const hasSavings = await collectionHasDocuments("savings");
+    if (hasSavings) return;
 
     const payments = await fetchAllPayments();
     if (payments.length === 0) return;
@@ -210,6 +299,17 @@ async function ensureAdminMember(): Promise<void> {
 export async function seedDefaultMembers(): Promise<void> {
   if (typeof window === "undefined" || !isFirebaseConfigured()) return;
 
+  try {
+    const res = await fetch("/api/setup/seed", { method: "POST" });
+    if (res.ok) {
+      const result = (await res.json()) as { seeded?: boolean; reason?: string };
+      console.log("Server Firestore seed:", result);
+      if (result.seeded) return;
+    }
+  } catch (err) {
+    console.warn("Server seed unavailable, using client Firestore writes:", err);
+  }
+
   await ensureAdminMember();
 
   try {
@@ -225,27 +325,14 @@ export async function seedDefaultMembers(): Promise<void> {
   }
 
   try {
-    const countSnapshot = await getCountFromServer(collection(db(), "members"));
-    if (countSnapshot.data().count > 0) return;
+    const hasMembers = await collectionHasDocuments("members");
+    if (hasMembers) return;
   } catch (err) {
     console.error("FIRESTORE members count error:", err);
     return;
   }
 
-  for (const profile of DEFAULT_MEMBER_PROFILES) {
-    await addMember({
-      name: profile.name,
-      email: profile.email,
-      monthlyFee: profile.monthlyFee,
-      annualTarget: profile.annualTarget,
-      joinDate: DEFAULT_SETTINGS.groupStartDate,
-      loginActive: false,
-      status: "active",
-      paid: false,
-      password: hashPassword(DEFAULT_MEMBER_PASSWORD),
-    });
-  }
-
+  // Only ensure admin exists when DB is empty — no hardcoded member list on client.
   await addMember({
     name: "Maamulaha",
     email: ADMIN_EMAIL,
@@ -265,9 +352,12 @@ export function subscribeMembers(callback: (members: Member[]) => void): Unsubsc
     return () => undefined;
   }
 
+  void ensureFirestoreOnline();
+
   return onSnapshot(
     collection(db(), "members"),
     (snapshot) => {
+      console.log("Firestore members snapshot:", snapshot.docs.length, "documents");
       const members = snapshot.docs
         .map((snap) => normalizeMember(rowToMember({ id: snap.id, ...snap.data() })))
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -287,9 +377,12 @@ export function subscribePayments(callback: (payments: Payment[]) => void): Unsu
   }
 
   return onSnapshot(
-    query(collection(db(), "payments"), orderBy("paid_at", "desc")),
+    collection(db(), "payments"),
     (snapshot) => {
-      callback(mapCollectionSnapshot(snapshot, rowToPayment));
+      const payments = mapCollectionSnapshot(snapshot, rowToPayment).sort(
+        (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
+      );
+      callback(payments);
     },
     (err) => {
       console.error("FIRESTORE payments fetch error:", err);
@@ -345,13 +438,13 @@ export function subscribeAnnouncements(callback: (items: Announcement[]) => void
   }
 
   return onSnapshot(
-    query(collection(db(), "announcements"), orderBy("created_at", "desc")),
+    collection(db(), "announcements"),
     (snapshot) => {
       const now = Date.now();
       callback(
-        mapCollectionSnapshot(snapshot, rowToAnnouncement).filter(
-          (a) => new Date(a.expiresAt).getTime() > now
-        )
+        mapCollectionSnapshot(snapshot, rowToAnnouncement)
+          .filter((a) => new Date(a.expiresAt).getTime() > now)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       );
     },
     (err) => {
@@ -368,9 +461,13 @@ export function subscribeChats(callback: (messages: ChatMessage[]) => void): Uns
   }
 
   return onSnapshot(
-    query(collection(db(), "chats"), orderBy("sent_at", "asc")),
+    collection(db(), "chats"),
     (snapshot) => {
-      callback(mapCollectionSnapshot(snapshot, rowToChat));
+      callback(
+        mapCollectionSnapshot(snapshot, rowToChat).sort(
+          (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()
+        )
+      );
     },
     (err) => {
       console.error("FIRESTORE chats fetch error:", err);
@@ -402,21 +499,29 @@ export async function addMemberWithAuth(input: AddMemberWithAuthInput): Promise<
   const existing = await fetchAllMembers();
   if (isLoginIdTakenLocal(existing, loginId)) throw new Error("Login ID-kan horey ayaa loo isticmaalay");
 
-  const uid = await createMemberFirebaseAuth(loginId, password);
   const createdAt = new Date().toISOString();
   const settings = await fetchSettingsRow();
   const joinDate = settings.groupStartDate || DEFAULT_SETTINGS.groupStartDate;
 
-  const firestoreRow = newMemberToFirestore({
-    name,
-    loginId,
-    contribution,
-    uid,
-    joinDate,
-    createdAt,
-  });
+  // 1) Server: Firebase Auth user + Firestore members/{uid} (best — syncs Auth list + DB)
+  const serverResult = await createMemberViaServerApi({ name, loginId, password, contribution });
 
-  await setDoc(doc(db(), "members", uid), firestoreRow);
+  let uid: string;
+  if (serverResult) {
+    uid = serverResult.uid;
+  } else {
+    // 2) Client fallback: Auth via secondary app + Firestore doc id = uid
+    uid = await createMemberFirebaseAuth(loginId, password);
+    const firestoreRow = newMemberToFirestore({
+      name,
+      loginId,
+      contribution,
+      uid,
+      joinDate,
+      createdAt,
+    });
+    await firestoreSetMemberByUid(uid, firestoreRow);
+  }
 
   return normalizeMember({
     id: uid,
@@ -441,25 +546,50 @@ function isLoginIdTakenLocal(members: Member[], loginId: string): boolean {
 
 export async function addMember(member: Omit<Member, "id" | "createdAt">): Promise<Member> {
   const profile = profileDefaultsForName(member.name);
-  const newMember = normalizeMember({
-    ...member,
-    id: generateId(),
-    createdAt: new Date().toISOString(),
-    email: member.email ?? profile?.email ?? "",
-    monthlyFee: member.monthlyFee ?? profile?.monthlyFee,
-    annualTarget: member.annualTarget ?? profile?.annualTarget,
-    password: member.password ?? (profile ? hashPassword(DEFAULT_MEMBER_PASSWORD) : undefined),
-    loginActive: member.loginActive ?? false,
-    status: member.status ?? "active",
-    paid: member.paid ?? false,
-  });
+  const createdAt = new Date().toISOString();
+  const loginId =
+    member.loginId ??
+    (member.email ? normalizeLoginId(member.email) : undefined);
+  const contribution = member.monthlyFee ?? profile?.monthlyFee ?? DEFAULT_SETTINGS.monthlyFee;
 
   if (!isFirebaseConfigured()) {
     throw new Error("Firestore ma diyaar ahayn");
   }
 
-  await setDoc(doc(db(), "members", newMember.id), memberToRow(newMember));
-  return newMember;
+  const firestoreRow = {
+    name: member.name,
+    loginId: loginId ?? "",
+    contributionAmount: contribution,
+    paid: member.paid ?? false,
+    createdAt,
+    uid: member.uid ?? null,
+    email: member.email ?? profile?.email ?? "",
+    phone: member.phone ?? "",
+    password: member.password ?? (profile ? hashPassword(DEFAULT_MEMBER_PASSWORD) : null),
+    join_date: member.joinDate ?? DEFAULT_SETTINGS.groupStartDate,
+    end_date: member.endDate ?? null,
+    monthly_fee: contribution,
+    annual_target: member.annualTarget ?? profile?.annualTarget ?? contribution * 12,
+    login_active: member.loginActive ?? false,
+    status: member.status ?? "active",
+    avatar_url: member.avatarUrl ?? null,
+  };
+
+  const memberId = await firestoreAddMember(firestoreRow);
+
+  return normalizeMember({
+    ...member,
+    id: memberId,
+    createdAt,
+    email: member.email ?? profile?.email ?? "",
+    loginId,
+    monthlyFee: contribution,
+    annualTarget: member.annualTarget ?? profile?.annualTarget ?? contribution * 12,
+    password: member.password ?? (profile ? hashPassword(DEFAULT_MEMBER_PASSWORD) : undefined),
+    loginActive: member.loginActive ?? false,
+    status: member.status ?? "active",
+    paid: member.paid ?? false,
+  });
 }
 
 export async function updateMember(memberId: string, data: Partial<Member>): Promise<void> {
@@ -472,7 +602,7 @@ export async function updateMember(memberId: string, data: Partial<Member>): Pro
   if (!existingSnapshot.exists()) return;
   const merged = normalizeMember({ ...rowToMember({ id: existingSnapshot.id, ...existingSnapshot.data() }), ...data });
   const row = memberToRow(merged);
-  await updateDoc(memberRef, row);
+  await firestoreUpdateMemberDoc(memberId, row);
 }
 
 export async function deleteMember(memberId: string): Promise<void> {
@@ -487,27 +617,39 @@ export async function archiveMemberToBin(
     throw new Error("Firestore ma diyaar ahayn");
   }
 
+  await ensureFirestoreWriteAccess();
+
   const memberRef = doc(db(), "members", memberId);
   const memberSnapshot = await getDoc(memberRef);
-  if (!memberSnapshot.exists()) return;
+  if (!memberSnapshot.exists()) {
+    throw new Error("Xubinta lama helin");
+  }
 
   const member = normalizeMember(rowToMember({ id: memberSnapshot.id, ...memberSnapshot.data() }));
-  if (member.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return;
+  if (member.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+    throw new Error("Maamulaha lama tirtiri karo");
+  }
+
+  const archivedMember: Member = {
+    ...member,
+    loginActive: false,
+    status: "removed",
+  };
 
   const paymentsSnapshot = await getDocs(collection(db(), "payments"));
   const memberPayments = paymentsSnapshot.docs
     .map((snap) => rowToPayment({ id: snap.id, ...snap.data() }))
-    .filter((p) => p.memberId === memberId);
+    .filter((p) => paymentBelongsToMember(p, member));
 
   const chatsSnapshot = await getDocs(collection(db(), "chats"));
   const memberChats = chatsSnapshot.docs
     .map((snap) => rowToChat({ id: snap.id, ...snap.data() }))
-    .filter((c) => c.memberId === memberId);
+    .filter((c) => c.memberId === memberId || c.memberId === member.uid);
 
   const archiveId = generateId();
   await setDoc(doc(db(), "bin", archiveId), {
     id: archiveId,
-    member,
+    member: archivedMember,
     payments: memberPayments,
     chats: memberChats,
     archived_at: new Date().toISOString(),
@@ -527,11 +669,28 @@ export async function archiveMemberToBin(
   const savingsSnapshot = await getDocs(collection(db(), "savings"));
   savingsSnapshot.docs.forEach((snap) => {
     const row = { id: snap.id, ...snap.data() } as Record<string, unknown>;
-    if (row.member_id === memberId) {
+    const savingsMemberId = row.member_id as string;
+    if (
+      savingsMemberId === memberId ||
+      savingsMemberId === member.uid ||
+      memberPayments.some((p) => p.id === snap.id)
+    ) {
       batch.delete(doc(db(), "savings", snap.id));
     }
   });
   await batch.commit();
+
+  if (member.uid) {
+    try {
+      await fetch("/api/members/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: member.uid, email: member.email }),
+      });
+    } catch (err) {
+      console.warn("Auth user delete skipped:", err);
+    }
+  }
 }
 
 export async function restoreMemberFromBin(archiveId: string): Promise<void> {
@@ -573,9 +732,13 @@ export function subscribeBin(callback: (records: ArchivedMemberRecord[]) => void
   }
 
   return onSnapshot(
-    query(collection(db(), "bin"), orderBy("archived_at", "desc")),
+    collection(db(), "bin"),
     (snapshot) => {
-      callback(mapCollectionSnapshot(snapshot, rowToBin));
+      callback(
+        mapCollectionSnapshot(snapshot, rowToBin).sort(
+          (a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime()
+        )
+      );
     },
     (err) => {
       console.error("FIRESTORE bin fetch error:", err);
@@ -595,34 +758,112 @@ export async function archiveRemovedMembers(): Promise<void> {
 }
 
 export async function setMemberPaid(memberId: string, paid: boolean): Promise<void> {
-  await ensureFirestoreWriteAccess();
-  await updateDoc(doc(db(), "members", memberId), { paid });
+  await firestoreUpdateMemberDoc(memberId, { paid });
 }
 
 export async function addPayment(payment: Omit<Payment, "id">): Promise<Payment> {
   const newPayment: Payment = { ...payment, id: generateId() };
-  await ensureFirestoreWriteAccess();
+  const paymentRow = paymentToRow({ ...newPayment, note: newPayment.note ?? "" });
 
-  await setDoc(doc(db(), "payments", newPayment.id), paymentToRow({ ...newPayment, note: newPayment.note ?? "" }));
-  await updateDoc(doc(db(), "members", payment.memberId), { paid: true });
-  await upsertSavingsRecord(newPayment);
-  return newPayment;
+  console.log("Writing to Firestore", paymentRow);
+  try {
+    await ensureFirestoreWriteAccess();
+    await setDoc(doc(db(), "payments", newPayment.id), paymentRow);
+    console.log("Firestore success", newPayment.id);
+
+    const members = await fetchAllMembers();
+    const member = members.find(
+      (m) => m.id === payment.memberId || m.uid === payment.memberId
+    );
+    if (member) {
+      const updates: Record<string, unknown> = { paid: true };
+      if (member.status === "warning") updates.status = "active";
+      await firestoreUpdateMemberDoc(member.id, updates);
+    } else {
+      await firestoreUpdateMemberDoc(payment.memberId, { paid: true });
+    }
+
+    await upsertSavingsRecord(newPayment);
+    return newPayment;
+  } catch (err) {
+    console.error("Firestore FAILED", err);
+    throw err;
+  }
 }
 
-export async function deletePayment(paymentId: string): Promise<void> {
+export async function deletePayment(paymentId: string, memberHint?: Member): Promise<void> {
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firestore ma diyaar ahayn");
+  }
+
   await ensureFirestoreWriteAccess();
 
-  const paymentRef = doc(db(), "payments", paymentId);
+  let resolvedDocId = paymentId;
+  let memberId: string | undefined;
+
+  const tryRef = doc(db(), "payments", resolvedDocId);
+  const trySnap = await getDoc(tryRef);
+
+  if (trySnap.exists()) {
+    memberId = trySnap.data().member_id as string | undefined;
+  } else if (memberHint) {
+    const snapshot = await getDocs(collection(db(), "payments"));
+    const monthKey = getCurrentMonthKey();
+    const match = snapshot.docs.find((snap) => {
+      const payment = rowToPayment({ ...snap.data(), id: snap.id });
+      return (
+        paymentBelongsToMember(payment, memberHint) &&
+        formatMonthKey(payment.year, payment.month) === monthKey
+      );
+    });
+    if (match) {
+      resolvedDocId = match.id;
+      memberId = match.data().member_id as string | undefined;
+    } else {
+      const cached = findCurrentMonthPayment(await fetchAllPayments(), memberHint);
+      if (cached) {
+        const cachedRef = doc(db(), "payments", cached.id);
+        const cachedSnap = await getDoc(cachedRef);
+        if (cachedSnap.exists()) {
+          resolvedDocId = cached.id;
+          memberId = cachedSnap.data().member_id as string | undefined;
+        }
+      }
+    }
+  }
+
+  const paymentRef = doc(db(), "payments", resolvedDocId);
   const paymentSnapshot = await getDoc(paymentRef);
-  const memberId = paymentSnapshot.exists()
-    ? (paymentSnapshot.data().member_id as string)
-    : undefined;
+  if (!paymentSnapshot.exists()) {
+    throw new Error("Lacag bixinta lama helin");
+  }
 
-  await deleteDoc(paymentRef);
-  await removeSavingsRecord(paymentId);
+  memberId = memberId ?? (paymentSnapshot.data().member_id as string | undefined);
 
-  if (memberId) {
-    await updateDoc(doc(db(), "members", memberId), { paid: false });
+  console.log("Writing to Firestore", { action: "deletePayment", paymentId: resolvedDocId, memberId });
+  try {
+    await deleteDoc(paymentRef);
+    await removeSavingsRecord(resolvedDocId);
+
+    if (memberId) {
+      try {
+        const members = await fetchAllMembers();
+        const member =
+          memberHint ??
+          members.find((m) => m.id === memberId || m.uid === memberId);
+        if (member) {
+          const remaining = (await fetchAllPayments()).filter((p) => p.id !== resolvedDocId);
+          const stillPaidThisMonth = isCurrentMonthPaid(remaining, member);
+          await firestoreUpdateMemberDoc(member.id, { paid: stillPaidThisMonth });
+        }
+      } catch (memberErr) {
+        console.warn("Member paid flag update failed after payment delete:", memberErr);
+      }
+    }
+    console.log("Firestore success", resolvedDocId);
+  } catch (err) {
+    console.error("Firestore FAILED", err);
+    throw err;
   }
 }
 
@@ -684,6 +925,6 @@ export async function fetchSettings(): Promise<AppSettings> {
   return fetchSettingsRow();
 }
 
-export function getDataMode(): "firebase" | "demo" {
-  return isFirebaseConfigured() ? "firebase" : "demo";
+export function getDataMode(): "firebase" {
+  return "firebase";
 }

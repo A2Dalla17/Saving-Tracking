@@ -1,3 +1,3 @@
 "use client";
 
-export { db, getClientDb, getClientAuth, firebaseConfig } from "@/lib/firebase";
+export { db, getClientDb, getClientAuth, ensureFirestoreOnline, firebaseConfig } from "@/lib/firebase";

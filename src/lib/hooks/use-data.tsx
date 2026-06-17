@@ -29,6 +29,7 @@ import {
   addChatMessage,
   deleteChatMessage,
   seedDefaultMembers,
+  setMemberPaid,
 } from "@/lib/data-store";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
@@ -56,7 +57,8 @@ interface DataContextValue {
   removeMember: (id: string) => Promise<void>;
   restoreFromBin: (archiveId: string) => Promise<void>;
   recordPayment: (data: Omit<Payment, "id">) => Promise<Payment>;
-  removePayment: (id: string) => Promise<void>;
+  removePayment: (id: string, member?: Member) => Promise<void>;
+  markMemberPaid: (memberId: string, paid: boolean) => Promise<void>;
   updateSettings: (settings: AppSettings) => Promise<void>;
   postAnnouncement: (message: string, durationHours: number) => Promise<void>;
   sendChat: (memberId: string, message: string, fromAdmin: boolean, senderName?: string) => Promise<void>;
@@ -65,21 +67,19 @@ interface DataContextValue {
 
 const DataContext = createContext<DataContextValue | null>(null);
 
-const LOAD_TIMEOUT_MS = 5000;
-
 export function DataProvider({ children }: { children: ReactNode }) {
   const hydrated = useHydrated();
-  const { user, loading: authLoading, reconcileWithMembers } = useAuth();
+  const { user, loading: authLoading, reconcileWithMembers, logout } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [chats, setChats] = useState<ChatMessage[]>([]);
   const [bin, setBin] = useState<ArchivedMemberRecord[]>([]);
-  const [dataReady, setDataReady] = useState(false);
+  const [membersReady, setMembersReady] = useState(false);
   const syncingRef = useRef(false);
 
-  const loading = !hydrated || authLoading || !dataReady;
+  const loading = !hydrated || authLoading || !membersReady;
 
   const syncMemberStatuses = useCallback(
     async (memberList: Member[], paymentList: Payment[], appSettings: AppSettings) => {
@@ -108,105 +108,56 @@ export function DataProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  // Firestore onSnapshot — single source of truth; start immediately, never wait for seed.
   useEffect(() => {
-    if (!hydrated || authLoading) return;
+    if (!hydrated) return;
 
-    let unsubMembers: (() => void) | undefined;
-    let unsubPayments: (() => void) | undefined;
-    let unsubSettings: (() => void) | undefined;
-    let unsubAnnouncements: (() => void) | undefined;
-    let unsubChats: (() => void) | undefined;
-    let unsubBin: (() => void) | undefined;
-
-    const timeout = setTimeout(() => setDataReady(true), LOAD_TIMEOUT_MS);
-
-    const loadForLogin = () => {
-      unsubMembers = subscribeMembers((data) => {
-        setMembers(data);
-        setDataReady(true);
-      });
-      unsubPayments = subscribePayments((data) => {
-        setPayments(data);
-      });
-    };
-
-    const loadFull = () => {
-      let membersLoaded = false;
-      let paymentsLoaded = false;
-      let settingsLoaded = false;
-      let announcementsLoaded = false;
-      let chatsLoaded = false;
-      let binLoaded = false;
-
-      const checkLoaded = () => {
-        if (membersLoaded && paymentsLoaded && settingsLoaded && announcementsLoaded && chatsLoaded && binLoaded) {
-          setDataReady(true);
-        }
-      };
-
-      unsubMembers = subscribeMembers((data) => {
-        setMembers(data);
-        membersLoaded = true;
-        checkLoaded();
-      });
-      unsubPayments = subscribePayments((data) => {
-        setPayments(data);
-        paymentsLoaded = true;
-        checkLoaded();
-      });
-      unsubSettings = subscribeSettings((data) => {
-        setSettings(data);
-        settingsLoaded = true;
-        checkLoaded();
-      });
-      unsubAnnouncements = subscribeAnnouncements((data) => {
-        setAnnouncements(data);
-        announcementsLoaded = true;
-        checkLoaded();
-      });
-      unsubChats = subscribeChats((data) => {
-        setChats(data);
-        chatsLoaded = true;
-        checkLoaded();
-      });
-      unsubBin = subscribeBin((data) => {
-        setBin(data);
-        binLoaded = true;
-        checkLoaded();
-      });
-    };
-
-    setDataReady(false);
-
-    seedDefaultMembers()
-      .then(() => {
-        if (user) {
-          loadFull();
-        } else {
-          loadForLogin();
-        }
-      })
-      .catch((err) => {
-        console.error("seed/load error:", err);
-        setDataReady(true);
-      });
+    const unsubMembers = subscribeMembers((data) => {
+      setMembers(data);
+      setMembersReady(true);
+    });
+    const unsubPayments = subscribePayments(setPayments);
+    const unsubSettings = subscribeSettings(setSettings);
+    const unsubAnnouncements = subscribeAnnouncements(setAnnouncements);
+    const unsubChats = subscribeChats(setChats);
+    const unsubBin = subscribeBin(setBin);
 
     return () => {
-      clearTimeout(timeout);
-      unsubMembers?.();
-      unsubPayments?.();
-      unsubSettings?.();
-      unsubAnnouncements?.();
-      unsubChats?.();
-      unsubBin?.();
+      unsubMembers();
+      unsubPayments();
+      unsubSettings();
+      unsubAnnouncements();
+      unsubChats();
+      unsubBin();
     };
-  }, [hydrated, user, authLoading]);
+  }, [hydrated]);
+
+  // Seed empty Firestore in background — does not gate the live subscription.
+  useEffect(() => {
+    if (!hydrated) return;
+    seedDefaultMembers().catch((err) => {
+      console.error("seed error:", err);
+    });
+  }, [hydrated]);
 
   useEffect(() => {
-    if (!loading && members.length > 0 && user?.isAdmin) {
-      syncMemberStatuses(members, payments, settings);
+    if (!membersReady || members.length === 0 || !user?.isAdmin) return;
+    syncMemberStatuses(members, payments, settings);
+  }, [members, payments, settings, membersReady, user, syncMemberStatuses]);
+
+  useEffect(() => {
+    if (!user || user.isAdmin || bin.length === 0) return;
+    const archived = bin.some(
+      (record) =>
+        record.member.id === user.memberId ||
+        record.member.uid === user.memberId ||
+        (user.email &&
+          record.member.email?.toLowerCase() === user.email.toLowerCase())
+    );
+    if (archived) {
+      void logout();
     }
-  }, [members, payments, settings, loading, user, syncMemberStatuses]);
+  }, [bin, user, logout]);
 
   useEffect(() => {
     if (members.length === 0 || !user) return;
@@ -223,10 +174,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const removeMember = useCallback(async (id: string) => deleteMember(id), []);
   const restoreFromBin = useCallback(async (archiveId: string) => restoreMemberFromBin(archiveId), []);
   const recordPayment = useCallback(async (data: Omit<Payment, "id">) => addPayment(data), []);
-  const removePayment = useCallback(async (id: string) => deletePayment(id), []);
+  const removePayment = useCallback(
+    async (id: string, member?: Member) => deletePayment(id, member),
+    []
+  );
+  const markMemberPaid = useCallback(
+    async (memberId: string, paid: boolean) => setMemberPaid(memberId, paid),
+    []
+  );
   const updateSettings = useCallback(async (newSettings: AppSettings) => {
     await saveSettings(newSettings);
-    setSettings(newSettings);
   }, []);
   const postAnnouncement = useCallback(async (message: string, durationHours: number) => {
     await addAnnouncement(message, durationHours);
@@ -256,6 +213,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         restoreFromBin,
         recordPayment,
         removePayment,
+        markMemberPaid,
         updateSettings,
         postAnnouncement,
         sendChat,

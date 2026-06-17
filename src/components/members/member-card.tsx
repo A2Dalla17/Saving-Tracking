@@ -19,7 +19,7 @@ export function MemberCard({ stats }: MemberCardProps) {
   const {
     member, totalPaid, debt, sharePercent, isCurrentMonthPaid,
     monthsPaid, memberMonthlyFee, annualTarget, annualProgress, consecutiveMissed,
-    currentMonthDue,
+    currentMonthDue, nextMonthDue,
   } = stats;
 
   const statusColors = {
@@ -82,7 +82,7 @@ export function MemberCard({ stats }: MemberCardProps) {
             <div className="mb-4 p-3 rounded-xl bg-muted border border-border text-xs">
               <p className="text-muted-foreground">{t.ledger.thisMonth}: <CurrencyDisplay amount={memberMonthlyFee} size="sm" /></p>
               <p className="text-card-foreground font-medium mt-1">
-                {t.ledger.nextMonth}: <CurrencyDisplay amount={memberMonthlyFee * 2} size="sm" />
+                {t.ledger.nextMonth}: <CurrencyDisplay amount={nextMonthDue} size="sm" />
                 <span className="text-muted-foreground font-normal ml-1">
                   ({formatCurrency(memberMonthlyFee)} + {formatCurrency(memberMonthlyFee)})
                 </span>

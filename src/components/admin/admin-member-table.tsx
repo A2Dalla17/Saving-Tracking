@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { MessageCircle, Trash2, Plus, Save } from "lucide-react";
+import { MessageCircle, Trash2, Plus, Save, Check, Undo2, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,8 +20,14 @@ import { useData } from "@/lib/hooks/use-data";
 import { hashPassword, isValidLoginId, isLoginIdTaken } from "@/lib/auth";
 import { isValidMemberLoginId, loginIdToEmail, normalizeLoginId } from "@/lib/member-auth";
 import { getStatusLabel, isAdminMember } from "@/lib/member-status";
+import {
+  calculateMemberStats,
+  calculateGroupStats,
+  getMonthName,
+  findCurrentMonthPayment,
+} from "@/lib/calculations";
 import { t } from "@/lib/somali";
-import type { Member } from "@/types";
+import type { Member, Payment } from "@/types";
 
 const EDIT_FIELDS: (keyof Member)[] = [
   "name",
@@ -35,12 +41,14 @@ const EDIT_FIELDS: (keyof Member)[] = [
   "status",
 ];
 
+type MemberDraft = Partial<Member>;
+
 export function AdminMemberTable() {
-  const { members, settings, createMemberWithAuth, editMember, removeMember } = useData();
-  const [editMembers, setEditMembers] = useState<Member[]>(members);
+  const { members, payments, settings, createMemberWithAuth, editMember, removeMember, recordPayment, removePayment } = useData();
+  const [drafts, setDrafts] = useState<Record<string, MemberDraft>>({});
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [tickingId, setTickingId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -48,9 +56,65 @@ export function AdminMemberTable() {
   const [newPassword, setNewPassword] = useState("");
   const [newContribution, setNewContribution] = useState(settings.monthlyFee);
 
-  useEffect(() => {
-    if (!dirty) setEditMembers(members);
-  }, [members, dirty]);
+  const payingMembers = useMemo(() => members.filter((m) => !isAdminMember(m) && m.status !== "removed"), [members]);
+  const groupStats = useMemo(
+    () => calculateGroupStats(payingMembers, payments, settings),
+    [payingMembers, payments, settings]
+  );
+  const getMemberStats = (member: Member) =>
+    calculateMemberStats(member, payments, groupStats.totalSavings, settings);
+
+  const handleTickPayment = async (member: Member) => {
+    const stats = getMemberStats(member);
+    if (stats.isCurrentMonthPaid) {
+      toast.info(t.ledger.alreadyPaid);
+      return;
+    }
+    const now = new Date();
+    setTickingId(member.id);
+    try {
+      await recordPayment({
+        memberId: member.id,
+        memberName: member.name,
+        amount: stats.currentMonthDue,
+        month: getMonthName(now),
+        year: now.getFullYear(),
+        paidAt: now.toISOString(),
+      });
+      toast.success(t.ledger.paymentTicked);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.common.error;
+      toast.error(message);
+    } finally {
+      setTickingId(null);
+    }
+  };
+
+  const handleUndoPayment = async (member: Member, payment?: Payment) => {
+    const target = payment ?? findCurrentMonthPayment(payments, member);
+    if (!target) {
+      toast.error(t.ledger.paymentNotFound);
+      return;
+    }
+    if (!confirm(t.ledger.confirmUndo.replace("{name}", member.name))) return;
+    setTickingId(member.id);
+    try {
+      await removePayment(target.id, member);
+      toast.success(t.ledger.paymentUndone);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.common.error;
+      toast.error(message);
+    } finally {
+      setTickingId(null);
+    }
+  };
+
+  const displayMembers = useMemo(
+    () => members.map((m) => ({ ...m, ...drafts[m.id] })),
+    [members, drafts]
+  );
+
+  const hasDrafts = Object.keys(drafts).length > 0 || Object.keys(passwordDrafts).length > 0;
 
   useEffect(() => {
     if (addOpen) setNewContribution(settings.monthlyFee);
@@ -60,12 +124,13 @@ export function AdminMemberTable() {
     member.loginId ?? (member.email ? normalizeLoginId(member.email) : "");
 
   const updateField = (id: string, field: keyof Member, value: string | number | boolean) => {
-    setDirty(true);
-    setEditMembers((prev) => prev.map((m) => (m.id === id ? { ...m, [field]: value } : m)));
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], [field]: value },
+    }));
   };
 
   const updatePasswordDraft = (id: string, value: string) => {
-    setDirty(true);
     setPasswordDrafts((prev) => ({ ...prev, [id]: value }));
   };
 
@@ -77,7 +142,7 @@ export function AdminMemberTable() {
     if (isAdminMember(member)) return null;
     const loginId = member.email?.trim() ?? displayLoginId(member);
     if (loginId && !isValidLoginId(loginId) && !isValidMemberLoginId(loginId)) return t.admin.loginIdInvalid;
-    if (loginId && isLoginIdTaken(editMembers, loginId, member.id)) return t.admin.loginIdTaken;
+    if (loginId && isLoginIdTaken(displayMembers, loginId, member.id)) return t.admin.loginIdTaken;
     if (requireActive || member.loginActive) {
       if (!loginId) return t.admin.loginIdRequired;
       const stored = members.find((m) => m.id === member.id);
@@ -109,7 +174,8 @@ export function AdminMemberTable() {
   };
 
   const handleSave = async () => {
-    for (const em of editMembers) {
+    for (const em of displayMembers) {
+      if (!drafts[em.id] && !passwordDrafts[em.id]) continue;
       const error = validateMemberCredentials(em, passwordDrafts[em.id], em.loginActive);
       if (error) {
         toast.error(`${em.name}: ${error}`);
@@ -119,7 +185,8 @@ export function AdminMemberTable() {
 
     setSaving(true);
     try {
-      for (const em of editMembers) {
+      for (const em of displayMembers) {
+        if (!drafts[em.id] && !passwordDrafts[em.id]) continue;
         const original = members.find((m) => m.id === em.id);
         const updates = buildUpdates(em, original, passwordDrafts[em.id]?.trim());
         if (Object.keys(updates).length > 0) {
@@ -127,7 +194,7 @@ export function AdminMemberTable() {
         }
       }
       setPasswordDrafts({});
-      setDirty(false);
+      setDrafts({});
       toast.success(t.admin.saved);
     } catch (err) {
       const message = err instanceof Error ? err.message : t.common.error;
@@ -162,24 +229,16 @@ export function AdminMemberTable() {
       setSaving(true);
       try {
         await editMember(em.id, updates);
-        setEditMembers((prev) =>
-          prev.map((m) =>
-            m.id === em.id
-              ? {
-                  ...m,
-                  ...updates,
-                  password: updates.password ?? m.password,
-                  loginActive: true,
-                }
-              : m
-          )
-        );
         setPasswordDrafts((prev) => {
           const next = { ...prev };
           delete next[em.id];
           return next;
         });
-        setDirty(false);
+        setDrafts((prev) => {
+          const next = { ...prev };
+          delete next[em.id];
+          return next;
+        });
         toast.success(t.admin.loginActivated);
       } catch {
         toast.error(t.common.error);
@@ -191,9 +250,6 @@ export function AdminMemberTable() {
 
     try {
       await editMember(em.id, { loginActive: false });
-      setEditMembers((prev) =>
-        prev.map((m) => (m.id === em.id ? { ...m, loginActive: false } : m))
-      );
       toast.success(t.admin.loginDeactivated);
     } catch {
       toast.error(t.common.error);
@@ -253,8 +309,13 @@ export function AdminMemberTable() {
 
   const handleDelete = async (id: string) => {
     if (!confirm(t.members.confirmDelete)) return;
-    await removeMember(id);
-    toast.success(t.members.memberDeleted);
+    try {
+      await removeMember(id);
+      toast.success(t.members.memberDeleted);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.common.error;
+      toast.error(message);
+    }
   };
 
   return (
@@ -263,7 +324,9 @@ export function AdminMemberTable() {
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
             <CardTitle>{t.admin.memberTable}</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">{t.admin.addMemberHint}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t.admin.addMemberHint} · {members.length} {t.members.title.toLowerCase()} (Firestore)
+            </p>
           </div>
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -271,7 +334,7 @@ export function AdminMemberTable() {
           </Button>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1100px]">
+          <table className="w-full text-sm min-w-[1200px]">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 px-2">{t.members.name}</th>
@@ -279,13 +342,14 @@ export function AdminMemberTable() {
                 <th className="py-2 px-2">{t.admin.newPassword}</th>
                 <th className="py-2 px-2">{t.profile.monthlyRequired}</th>
                 <th className="py-2 px-2">{t.admin.paid}</th>
+                <th className="py-2 px-2">{t.ledger.action}</th>
                 <th className="py-2 px-2">{t.admin.status}</th>
                 <th className="py-2 px-2">{t.admin.login}</th>
                 <th className="py-2 px-2"></th>
               </tr>
             </thead>
             <tbody>
-              {editMembers.map((m) => (
+              {displayMembers.map((m) => (
                 <tr key={m.id} className="border-b border-border text-card-foreground">
                   <td className="py-2 px-2">
                     <Input
@@ -338,7 +402,62 @@ export function AdminMemberTable() {
                     )}
                   </td>
                   <td className="py-2 px-2 text-xs">
-                    {isAdminMember(m) ? "—" : m.paid ? t.admin.paidYes : t.admin.paidNo}
+                    {isAdminMember(m) ? (
+                      "—"
+                    ) : (() => {
+                      const stats = getMemberStats(m);
+                      return stats.isCurrentMonthPaid ? (
+                        <span className="inline-flex items-center gap-1 text-card-foreground">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {t.admin.paidYes}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <XCircle className="h-3.5 w-3.5" />
+                          {t.admin.paidNo}
+                          {stats.consecutiveMissed > 0 && (
+                            <span className="block text-[10px] text-card-foreground">
+                              {t.ledger.escalated}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td className="py-2 px-2">
+                    {isAdminMember(m) ? (
+                      "—"
+                    ) : (() => {
+                      const stats = getMemberStats(m);
+                      const busy = tickingId === m.id;
+                      const currentPayment = stats.isCurrentMonthPaid
+                        ? findCurrentMonthPayment(payments, m)
+                        : undefined;
+                      return stats.isCurrentMonthPaid ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          disabled={busy}
+                          onClick={() => handleUndoPayment(m, currentPayment)}
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                          {t.ledger.undoPayment}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="gold"
+                          className="h-8"
+                          disabled={busy}
+                          onClick={() => handleTickPayment(m)}
+                          title={`${t.ledger.thisMonth}: $${stats.currentMonthDue}`}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          {t.ledger.tickPayment}
+                        </Button>
+                      );
+                    })()}
                   </td>
                   <td className="py-2 px-2 text-xs">{isAdminMember(m) ? "Maamule" : getStatusLabel(m.status)}</td>
                   <td className="py-2 px-2">
@@ -373,7 +492,7 @@ export function AdminMemberTable() {
               ))}
             </tbody>
           </table>
-          <Button onClick={handleSave} disabled={saving} className="mt-4" variant="gold">
+          <Button onClick={handleSave} disabled={saving || !hasDrafts} className="mt-4" variant="gold">
             <Save className="h-4 w-4" />
             {t.admin.saveAll}
           </Button>

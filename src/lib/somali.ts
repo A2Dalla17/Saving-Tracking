@@ -90,6 +90,7 @@ export const t = {
     undoPayment: "Dib u noqo",
     confirmUndo: "Ma hubtaa inaad ka laabato bixinta {name} bishan?",
     paymentUndone: "Bixinta waa la ka laabtay",
+    paymentNotFound: "Lacag bixinta bishan lama helin",
   },
   timeline: {
     title: "Taariikhda",
@@ -113,7 +114,8 @@ export const t = {
     shareOther: "Wadaag Apps Kale",
     pdfReady: "PDF-kaaga waa diyaar",
     pdfDownloaded: "PDF-ka waa la soo dejiyay",
-    noMember: "Xubintaada lama helin — la xiriir admin-ka",
+    noMember: "Fadlan soo gal si aad u aragto warbixintaada",
+    newAccountHint: "Koonto cusub — PDF-kaaga waa diyaar xitaa haddii aadan weli wax bixin",
     statementTitle: "Warbixin Maaliyadeed",
   },
   admin: {
@@ -160,6 +162,8 @@ export const t = {
     loginSetupHint: "1) Login ID + Password qor  2) Guji Active (auto kaydin)",
     saveAndActivate: "Kaydi & Active",
     bin: "Kaydka (Bin)",
+    loginArchived: "Login-ka waa la xiray (kaydka)",
+    loginStatus: "Xaaladda Login-ka",
     binTitle: "Xubnaha La Saaray",
     binSubtitle: "Xubnaha la saaray waxay halkan ku kaydsan yihiin. Waxaad dib ugu soo celin kartaa kooxda.",
     binEmpty: "Kaydka waa madhan — xubin la saaray ma jirto",
@@ -205,6 +209,11 @@ export const t = {
     photoUpdated: "Sawirka profile-ka waa la cusboonaysiiyay",
     photoRemoved: "Sawirka waa la saaray",
     notFound: "Xubinta lama helin",
+    currentMonth: "Bishan",
+    paidThisMonth: "Bixiyay bishan ✓",
+    unpaidThisMonth: "Ma bixin bishan ✗",
+    nextMonthDue: "Lacagta bisha xigta",
+    lastPayment: "Bixintii ugu dambeysay",
   },
   announcements: {
     title: "Ogeysiisyada",

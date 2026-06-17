@@ -2,7 +2,7 @@ import { verifyPassword, isAdminEmail } from "@/lib/auth";
 import { ADMIN_EMAIL } from "@/lib/constants";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { rowToMember } from "@/lib/firestore-mappers";
-import { loginIdToEmail, normalizeLoginId } from "@/lib/member-auth";
+import { loginIdToEmail, normalizeLoginId } from "@/lib/member-credentials";
 import type { Member } from "@/types";
 
 export async function findMemberByIdentifier(identifier: string): Promise<Member | null> {

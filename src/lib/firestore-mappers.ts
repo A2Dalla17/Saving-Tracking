@@ -10,6 +10,7 @@ import type {
 import { loginIdToEmail, normalizeLoginId } from "@/lib/member-auth";
 
 export function rowToMember(row: Record<string, unknown>): Member {
+  const docId = (row.id as string) || "";
   const loginId =
     (row.loginId as string) ||
     (row.login_id as string) ||
@@ -30,7 +31,7 @@ export function rowToMember(row: Record<string, unknown>): Member {
   const createdAtRaw = row.createdAt ?? row.created_at;
 
   return {
-    id: (row.uid as string) || (row.id as string),
+    id: docId,
     uid: (row.uid as string) || undefined,
     name: row.name as string,
     phone: (row.phone as string) || undefined,
@@ -95,6 +96,10 @@ export function newMemberToFirestore(input: {
     paid: false,
     uid: input.uid,
     createdAt: input.createdAt,
+    email: loginIdToEmail(loginId),
+    join_date: input.joinDate,
+    login_active: true,
+    status: "active",
   };
 }
 

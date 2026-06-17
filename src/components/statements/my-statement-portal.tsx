@@ -12,6 +12,7 @@ import { calculateMemberStats, calculateGroupStats } from "@/lib/calculations";
 import { getPayingMembers, filterPayingPayments } from "@/lib/member-status";
 import { resolveProfileMember } from "@/lib/resolve-profile-member";
 import { downloadMemberPdf, shareMemberPdf } from "@/lib/pdf";
+import { GroupAdminChat } from "@/components/shared/group-admin-chat";
 import { t } from "@/lib/somali";
 
 export function MyStatementPortal() {
@@ -27,7 +28,7 @@ export function MyStatementPortal() {
     : null;
 
   const handleDownload = () => {
-    if (!memberStats) {
+    if (!memberStats || !user) {
       toast.error(t.myStatement.noMember);
       return;
     }
@@ -40,7 +41,7 @@ export function MyStatementPortal() {
   };
 
   const handleShare = async () => {
-    if (!memberStats) {
+    if (!memberStats || !user) {
       toast.error(t.myStatement.noMember);
       return;
     }
@@ -74,11 +75,14 @@ export function MyStatementPortal() {
         </CardContent>
       </Card>
 
-      {memberStats && (
+      {memberStats ? (
         <Card className="animate-fade-in-up">
           <CardHeader>
             <CardTitle>{t.myStatement.yourStats}</CardTitle>
             <p className="text-lg font-heading font-bold text-card-foreground">{memberStats.member.name}</p>
+            {memberStats.totalPaid === 0 && (
+              <p className="text-sm text-muted-foreground">{t.myStatement.newAccountHint}</p>
+            )}
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
@@ -129,7 +133,15 @@ export function MyStatementPortal() {
             </div>
           </CardContent>
         </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            {t.common.loading}
+          </CardContent>
+        </Card>
       )}
+
+      {user && <GroupAdminChat />}
     </>
   );
 }

@@ -11,11 +11,12 @@ import {
   calculateGroupStats,
   getMonthName,
   getCurrentMonthKey,
-  formatMonthKey,
   formatCurrency,
+  findCurrentMonthPayment,
 } from "@/lib/calculations";
 import { getPayingMembers, filterPayingPayments } from "@/lib/member-status";
 import { t } from "@/lib/somali";
+import type { Member, Payment } from "@/types";
 
 export function PaymentTable() {
   const { members, payments, settings, recordPayment, removePayment } = useData();
@@ -23,24 +24,20 @@ export function PaymentTable() {
   const payingPayments = filterPayingPayments(members, payments);
   const groupStats = calculateGroupStats(payingMembers, payingPayments, settings);
   const currentMonth = getMonthName();
-  const currentMonthKey = getCurrentMonthKey();
 
-  const getCurrentMonthPayment = (memberId: string) =>
-    payments.find(
-      (p) =>
-        p.memberId === memberId &&
-        formatMonthKey(p.year, p.month) === currentMonthKey
-    );
-
-  const handleUndoPayment = async (memberId: string, memberName: string) => {
-    const payment = getCurrentMonthPayment(memberId);
-    if (!payment) return;
-    if (!confirm(t.ledger.confirmUndo.replace("{name}", memberName))) return;
+  const handleUndoPayment = async (member: Member, payment?: Payment) => {
+    const target = payment ?? findCurrentMonthPayment(payments, member);
+    if (!target) {
+      toast.error(t.ledger.paymentNotFound);
+      return;
+    }
+    if (!confirm(t.ledger.confirmUndo.replace("{name}", member.name))) return;
     try {
-      await removePayment(payment.id);
+      await removePayment(target.id, member);
       toast.success(t.ledger.paymentUndone);
-    } catch {
-      toast.error(t.common.error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.common.error;
+      toast.error(message);
     }
   };
 
@@ -75,7 +72,7 @@ export function PaymentTable() {
     );
   }
 
-  const allPaid = memberStatsList.every((ms) => ms.isCurrentMonthPaid || ms.member.paid);
+  const allPaid = memberStatsList.every((ms) => ms.isCurrentMonthPaid);
 
   return (
     <Card className="animate-fade-in-up">
@@ -98,7 +95,11 @@ export function PaymentTable() {
             </thead>
             <tbody>
               {memberStatsList.map((ms) => {
-                const isPaid = ms.isCurrentMonthPaid || ms.member.paid;
+                const isPaid = ms.isCurrentMonthPaid;
+                const currentPayment = isPaid
+                  ? findCurrentMonthPayment(payingPayments, ms.member) ??
+                    findCurrentMonthPayment(payments, ms.member)
+                  : undefined;
                 return (
                 <tr key={ms.member.id} className="border-b border-border hover:bg-muted transition-colors">
                   <td className="py-4 px-4">
@@ -153,7 +154,7 @@ export function PaymentTable() {
                         size="sm"
                         variant="outline"
                         className="text-card-foreground border-border hover:bg-muted"
-                        onClick={() => handleUndoPayment(ms.member.id, ms.member.name)}
+                        onClick={() => handleUndoPayment(ms.member, currentPayment)}
                       >
                         <Undo2 className="h-4 w-4" />
                         {t.ledger.undoPayment}

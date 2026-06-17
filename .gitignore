@@ -30,8 +30,20 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — secrets live only in .env.local (never commit)
+.env.local
+.env*.local
 .env*
+!.env.example
+!.env.local.example
+
+# Firebase service account JSON keys — never commit
+serviceAccount.json
+firebase-adminsdk*.json
+*firebase-adminsdk*.json
+*serviceAccount*.json
+*service-account*.json
+*credentials*.json
 
 # vercel
 .vercel

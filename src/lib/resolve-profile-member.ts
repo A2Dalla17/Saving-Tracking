@@ -1,6 +1,6 @@
 import { ADMIN_EMAIL, DEFAULT_SETTINGS } from "@/lib/constants";
 import { isAdminMember } from "@/lib/member-status";
-import { normalizeLoginId } from "@/lib/member-auth";
+import { normalizeLoginId, loginIdToEmail } from "@/lib/member-credentials";
 import type { AuthUser, Member } from "@/types";
 
 function normalizeEmail(value?: string): string {
@@ -16,6 +16,29 @@ function buildFallbackAdminMember(user: AuthUser): Member {
     joinDate: DEFAULT_SETTINGS.groupStartDate,
     monthlyFee: 0,
     annualTarget: 0,
+    loginActive: true,
+    status: "active",
+    paid: false,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/** Fallback when Firestore snapshot has not synced yet — new accounts still get profile/PDF/chat. */
+function buildFallbackMemberFromAuth(user: AuthUser): Member {
+  const email = normalizeEmail(user.email);
+  const loginId = email ? normalizeLoginId(email) : "";
+  const monthlyFee = DEFAULT_SETTINGS.monthlyFee;
+
+  return {
+    id: user.memberId,
+    uid: user.memberId,
+    name: user.name?.trim() || loginId || "Xubin",
+    email: email || (loginId ? loginIdToEmail(loginId) : ""),
+    loginId: loginId || undefined,
+    phone: user.phone ?? "",
+    joinDate: DEFAULT_SETTINGS.groupStartDate,
+    monthlyFee,
+    annualTarget: monthlyFee * 12,
     loginActive: true,
     status: "active",
     paid: false,
@@ -53,7 +76,7 @@ export function resolveProfileMember(
     return buildFallbackAdminMember(user);
   }
 
-  return undefined;
+  return buildFallbackMemberFromAuth(user);
 }
 
 export function isOwnProfileMember(member: Member, user: AuthUser | null | undefined): boolean {

@@ -35,7 +35,7 @@ const navItems = [
   { href: "/admin", label: t.nav.admin, icon: Shield, protected: true },
 ];
 
-const mobilePrimary = ["/dashboard", "/members", "/calendar", "/my-statement"];
+const mobilePrimary = ["/dashboard", "/members", "/profile", "/my-statement"];
 
 export function Sidebar() {
   const pathname = usePathname();

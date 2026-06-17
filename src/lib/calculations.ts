@@ -76,9 +76,26 @@ export function getMemberActiveMonths(member: Member, settings?: AppSettings, da
   return months;
 }
 
-export function isMonthPaid(payments: Payment[], memberId: string, monthKey: string): boolean {
+export function paymentBelongsToMember(payment: Payment, member: Member): boolean {
+  if (payment.memberId === member.id) return true;
+  if (member.uid && payment.memberId === member.uid) return true;
+  return false;
+}
+
+export function findCurrentMonthPayment(
+  payments: Payment[],
+  member: Member,
+  date: Date = new Date()
+): Payment | undefined {
+  const monthKey = getCurrentMonthKey(date);
+  return payments.find(
+    (p) => paymentBelongsToMember(p, member) && formatMonthKey(p.year, p.month) === monthKey
+  );
+}
+
+export function isMonthPaid(payments: Payment[], member: Member, monthKey: string): boolean {
   return payments.some(
-    (p) => p.memberId === memberId && formatMonthKey(p.year, p.month) === monthKey
+    (p) => paymentBelongsToMember(p, member) && formatMonthKey(p.year, p.month) === monthKey
   );
 }
 
@@ -94,7 +111,7 @@ export function getConsecutiveMissedBefore(
 
   let streak = 0;
   for (let i = priorMonths.length - 1; i >= 0; i--) {
-    if (!isMonthPaid(payments, member.id, priorMonths[i])) {
+    if (!isMonthPaid(payments, member, priorMonths[i])) {
       streak++;
     } else {
       break;
@@ -125,7 +142,7 @@ export function getNextMonthDue(
 ): number {
   const fee = getMemberMonthlyFee(member, settings);
   const escalation = settings?.lateFeeEscalation ?? true;
-  if (!escalation || isCurrentMonthPaid(payments, member.id, date)) return fee;
+  if (!escalation || isCurrentMonthPaid(payments, member, date)) return fee;
 
   const missedBefore = getConsecutiveMissedBefore(member, payments, settings, date);
   return fee * (missedBefore + 2);
@@ -140,13 +157,13 @@ export function calculateMemberDebt(
   const fee = getMemberMonthlyFee(member, settings);
   const escalation = settings?.lateFeeEscalation ?? true;
   const activeMonths = getMemberActiveMonths(member, settings, date);
-  const totalPaid = getMemberTotalPaid(payments, member.id);
+  const totalPaid = getMemberTotalPaid(payments, member);
 
   let expected = 0;
   let consecutiveMissed = 0;
 
   for (const monthKey of activeMonths) {
-    const paid = isMonthPaid(payments, member.id, monthKey);
+    const paid = isMonthPaid(payments, member, monthKey);
     if (!paid) {
       consecutiveMissed++;
       expected += escalation ? fee * consecutiveMissed : fee;
@@ -163,16 +180,24 @@ export function calculateSharePercent(memberPaid: number, groupTotal: number): n
   return (memberPaid / groupTotal) * 100;
 }
 
-export function getMemberPayments(payments: Payment[], memberId: string): Payment[] {
-  return payments.filter((p) => p.memberId === memberId);
+export function getMemberPayments(payments: Payment[], member: Member): Payment[] {
+  return payments.filter((p) => paymentBelongsToMember(p, member));
 }
 
-export function getMemberTotalPaid(payments: Payment[], memberId: string): number {
-  return getMemberPayments(payments, memberId).reduce((sum, p) => sum + p.amount, 0);
+export function getMemberTotalPaid(payments: Payment[], member: Member): number {
+  return getMemberPayments(payments, member).reduce((sum, p) => sum + p.amount, 0);
 }
 
-export function isCurrentMonthPaid(payments: Payment[], memberId: string, date: Date = new Date()): boolean {
-  return isMonthPaid(payments, memberId, getCurrentMonthKey(date));
+export function isCurrentMonthPaid(payments: Payment[], member: Member, date: Date = new Date()): boolean {
+  return isMonthPaid(payments, member, getCurrentMonthKey(date));
+}
+
+export function getLastMemberPayment(payments: Payment[], member: Member): Payment | undefined {
+  const memberPayments = getMemberPayments(payments, member);
+  if (memberPayments.length === 0) return undefined;
+  return [...memberPayments].sort(
+    (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
+  )[0];
 }
 
 export function calculateMemberStats(
@@ -182,8 +207,8 @@ export function calculateMemberStats(
   settings?: AppSettings,
   date: Date = new Date()
 ): MemberStats {
-  const totalPaid = getMemberTotalPaid(payments, member.id);
-  const memberPayments = getMemberPayments(payments, member.id);
+  const totalPaid = getMemberTotalPaid(payments, member);
+  const memberPayments = getMemberPayments(payments, member);
   const consecutiveMissed = getConsecutiveMissedBefore(member, payments, settings, date);
   const memberMonthlyFee = getMemberMonthlyFee(member, settings);
   const annualTarget = getMemberAnnualTarget(member, settings);
@@ -194,7 +219,7 @@ export function calculateMemberStats(
     debt: calculateMemberDebt(member, payments, settings, date),
     sharePercent: calculateSharePercent(totalPaid, groupTotal),
     monthsPaid: memberPayments.length,
-    isCurrentMonthPaid: isCurrentMonthPaid(payments, member.id, date),
+    isCurrentMonthPaid: isCurrentMonthPaid(payments, member, date),
     currentMonthDue: getCurrentMonthDue(member, payments, settings, date),
     nextMonthDue: getNextMonthDue(member, payments, settings, date),
     consecutiveMissed,

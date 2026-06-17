@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useData } from "@/lib/hooks/use-data";
 import { formatCurrency, formatDateTime } from "@/lib/calculations";
+import { normalizeLoginId } from "@/lib/member-auth";
 import { t } from "@/lib/somali";
 import type { ArchivedMemberRecord } from "@/types";
 
@@ -54,6 +55,9 @@ export function AdminBin() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-card-foreground">{record.member.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t.admin.loginId}: {record.member.loginId ?? normalizeLoginId(record.member.email ?? "") ?? "—"}
+                    </p>
                     <p className="text-sm text-muted-foreground">{record.member.email ?? record.member.phone ?? "—"}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {t.admin.archivedAt}: {formatDateTime(record.archivedAt)}
@@ -100,6 +104,16 @@ export function AdminBin() {
                     <div>
                       <p className="text-muted-foreground">{t.members.joinDate}</p>
                       <p className="font-medium">{new Date(record.member.joinDate).toLocaleDateString("so-SO")}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">{t.admin.loginId}</p>
+                      <p className="font-medium">
+                        {record.member.loginId ?? normalizeLoginId(record.member.email ?? "") ?? "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">{t.admin.loginStatus}</p>
+                      <p className="font-medium">{t.admin.loginArchived}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">{t.admin.paymentsSaved}</p>

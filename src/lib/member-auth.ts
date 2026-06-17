@@ -12,19 +12,22 @@ import { auth } from "@/lib/firebase";
 import { firebasePublicConfig as firebaseConfig } from "@/lib/firebase-public-config";
 import { isAdminEmail, isAdminLoginIdentifier } from "@/lib/auth";
 import { ADMIN_EMAIL, ADMIN_FIREBASE_EMAIL, ADMIN_PASSWORD } from "@/lib/constants";
+import {
+  MEMBER_AUTH_DOMAIN,
+  normalizeLoginId,
+  loginIdToEmail,
+  isValidMemberLoginId,
+} from "@/lib/member-credentials";
 import type { Member } from "@/types";
 
-export const MEMBER_AUTH_DOMAIN = "@ac7group.app";
 const SECONDARY_APP_NAME = "Secondary";
 
-export function normalizeLoginId(raw: string): string {
-  return raw.trim().split("@")[0]?.toLowerCase() ?? "";
-}
-
-/** Single source of truth: Login ID → Firebase Auth email. */
-export function loginIdToEmail(loginId: string): string {
-  return `${normalizeLoginId(loginId)}${MEMBER_AUTH_DOMAIN}`;
-}
+export {
+  MEMBER_AUTH_DOMAIN,
+  normalizeLoginId,
+  loginIdToEmail,
+  isValidMemberLoginId,
+} from "@/lib/member-credentials";
 
 /** Resolve what email to pass to signInWithEmailAndPassword. */
 export function resolveFirebaseLoginEmail(identifier: string): string {
@@ -224,9 +227,4 @@ export async function createMemberFirebaseAuth(loginId: string, password: string
   } finally {
     await signOut(secondaryAuth);
   }
-}
-
-export function isValidMemberLoginId(loginId: string): boolean {
-  const local = normalizeLoginId(loginId);
-  return local.length >= 2 && !/\s/.test(local) && /^[a-zA-Z0-9._-]+$/.test(local);
 }
