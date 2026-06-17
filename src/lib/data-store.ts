@@ -113,7 +113,11 @@ async function createMemberViaServerApi(input: {
     });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      console.warn("Server member create failed:", data.error ?? res.status);
+      const message = data.error ?? `Server error ${res.status}`;
+      console.warn("Server member create failed:", message);
+      if (res.status === 503) {
+        throw new Error(message);
+      }
       return null;
     }
     const data = (await res.json()) as { id: string; uid: string };

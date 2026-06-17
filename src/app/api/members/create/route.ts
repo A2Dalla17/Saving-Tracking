@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_SETTINGS } from "@/lib/constants";
-import { getFirebaseAdminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { getFirebaseAdminAuth, getFirestoreAdmin, getFirebaseAdminConfigError } from "@/lib/firebase-admin";
 import {
   isValidMemberLoginId,
   loginIdToEmail,
@@ -39,10 +39,9 @@ export async function POST(request: NextRequest) {
     const auth = getFirebaseAdminAuth();
     const db = getFirestoreAdmin();
     if (!auth || !db) {
-      return NextResponse.json(
-        { error: "Firebase Admin ma diyaar ahayn — ku dar FIREBASE_CLIENT_EMAIL iyo FIREBASE_PRIVATE_KEY" },
-        { status: 503 }
-      );
+      const message = getFirebaseAdminConfigError() ?? "Firebase Admin ma diyaar ahayn";
+      console.error("members/create:", message);
+      return NextResponse.json({ error: message }, { status: 503 });
     }
 
     const email = loginIdToEmail(loginId);
@@ -84,6 +83,7 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection("members").doc(uid).set(memberDoc, { merge: true });
+    console.log("members/create: Firestore write OK", { uid, loginId });
 
     return NextResponse.json({
       ok: true,

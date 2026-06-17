@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "dev:clean": "node scripts/clean-dev.mjs && next dev -p 3000",
-    "dev:win": "node scripts/ensure-lightningcss.mjs && node scripts/clean-dev.mjs && next dev -p 3000",
+    "dev:win": "node scripts/ensure-lightningcss.mjs && node scripts/kill-dev-port.mjs && node scripts/clean-dev.mjs && next dev -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
