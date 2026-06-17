@@ -81,7 +81,7 @@ export default function LoginPage() {
           )}
           <Button type="submit" className="w-full" variant="gold" disabled={submitting}>
             <LogIn className="h-4 w-4" />
-            {submitting ? t.common.loading : t.login.submit}
+            {submitting ? t.common.busy : t.login.submit}
           </Button>
         </form>
       </CardContent>

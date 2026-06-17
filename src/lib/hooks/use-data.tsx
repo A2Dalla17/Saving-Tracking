@@ -30,11 +30,14 @@ import {
   deleteChatMessage,
   seedDefaultMembers,
   setMemberPaid,
+  fetchMembersFromServerApi,
 } from "@/lib/data-store";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { getConsecutiveMissedBefore } from "@/lib/calculations";
 import { resolveMemberStatus, shouldDeactivateLogin, getPayingMembers } from "@/lib/member-status";
+import { ensureAdminFirebaseSession } from "@/lib/admin-firebase-auth";
+import { ensureFirestoreOnline } from "@/lib/firebase";
 import type { Member, Payment, AppSettings, Announcement, ChatMessage, ArchivedMemberRecord } from "@/types";
 import { DEFAULT_SETTINGS } from "@/lib/constants";
 
@@ -67,6 +70,18 @@ interface DataContextValue {
 
 const DataContext = createContext<DataContextValue | null>(null);
 
+function mergeMemberLists(client: Member[], server: Member[]): Member[] {
+  const byId = new Map<string, Member>();
+  for (const m of server) byId.set(m.id, m);
+  for (const m of client) {
+    const prev = byId.get(m.id);
+    byId.set(m.id, prev ? { ...prev, ...m } : m);
+  }
+  return Array.from(byId.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const hydrated = useHydrated();
   const { user, loading: authLoading, reconcileWithMembers, logout } = useAuth();
@@ -78,8 +93,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [bin, setBin] = useState<ArchivedMemberRecord[]>([]);
   const [membersReady, setMembersReady] = useState(false);
   const syncingRef = useRef(false);
+  const clientMembersRef = useRef<Member[]>([]);
+  const serverMembersRef = useRef<Member[]>([]);
 
-  const loading = !hydrated || authLoading || !membersReady;
+  const publishMembers = useCallback(() => {
+    setMembers(mergeMemberLists(clientMembersRef.current, serverMembersRef.current));
+    setMembersReady(true);
+  }, []);
+
+  const refreshMembersFromServer = useCallback(async () => {
+    try {
+      const server = await fetchMembersFromServerApi();
+      serverMembersRef.current = server;
+      publishMembers();
+      console.log("Admin members loaded from server:", server.length);
+    } catch (err) {
+      console.error("Server members fetch failed:", err);
+    }
+  }, [publishMembers]);
+
+  const loading = !hydrated || authLoading;
 
   const syncMemberStatuses = useCallback(
     async (memberList: Member[], paymentList: Payment[], appSettings: AppSettings) => {
@@ -108,41 +141,82 @@ export function DataProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  // Firestore onSnapshot — single source of truth; start immediately, never wait for seed.
+  // Firestore onSnapshot — requires Firebase Auth (rules: request.auth != null).
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !user) {
+      setMembersReady(false);
+      return;
+    }
+    setMembersReady(true);
 
-    const unsubMembers = subscribeMembers((data) => {
-      setMembers(data);
-      setMembersReady(true);
+    let cancelled = false;
+
+    async function startSubscriptions() {
+      // Firestore auth/network — background; do not block UI.
+      void ensureFirestoreOnline().catch((err) => {
+        console.error("Firestore network setup failed:", err);
+      });
+      if (user?.isAdmin) {
+        void ensureAdminFirebaseSession().then((adminSession) => {
+          if (!adminSession.success) {
+            console.error("Admin Firestore session failed:", adminSession.error);
+          }
+        });
+      }
+
+      if (cancelled) return;
+
+      const unsubMembers = subscribeMembers((data) => {
+        clientMembersRef.current = data;
+        publishMembers();
+      });
+      const unsubPayments = subscribePayments(setPayments);
+      const unsubSettings = subscribeSettings(setSettings);
+      const unsubAnnouncements = subscribeAnnouncements(setAnnouncements);
+      const unsubChats = subscribeChats(setChats);
+      const unsubBin = subscribeBin(setBin);
+
+      return () => {
+        unsubMembers();
+        unsubPayments();
+        unsubSettings();
+        unsubAnnouncements();
+        unsubChats();
+        unsubBin();
+      };
+    }
+
+    let cleanup: (() => void) | undefined;
+    void startSubscriptions().then((fn) => {
+      cleanup = fn;
     });
-    const unsubPayments = subscribePayments(setPayments);
-    const unsubSettings = subscribeSettings(setSettings);
-    const unsubAnnouncements = subscribeAnnouncements(setAnnouncements);
-    const unsubChats = subscribeChats(setChats);
-    const unsubBin = subscribeBin(setBin);
 
     return () => {
-      unsubMembers();
-      unsubPayments();
-      unsubSettings();
-      unsubAnnouncements();
-      unsubChats();
-      unsubBin();
+      cancelled = true;
+      cleanup?.();
     };
-  }, [hydrated]);
+  }, [hydrated, user, publishMembers]);
 
-  // Seed empty Firestore in background — does not gate the live subscription.
+  // Admin: always load full member list from server (Admin SDK) so added users always appear.
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !user?.isAdmin) return;
+    void refreshMembersFromServer();
+  }, [hydrated, user, refreshMembersFromServer]);
+
+  // Seed empty Firestore in background — only when admin is logged in.
+  useEffect(() => {
+    if (!hydrated || !user?.isAdmin) return;
     seedDefaultMembers().catch((err) => {
       console.error("seed error:", err);
     });
-  }, [hydrated]);
+  }, [hydrated, user]);
 
   useEffect(() => {
     if (!membersReady || members.length === 0 || !user?.isAdmin) return;
-    syncMemberStatuses(members, payments, settings);
+    const timer = window.setTimeout(() => {
+      void syncMemberStatuses(members, payments, settings);
+    }, 2000);
+    return () => window.clearTimeout(timer);
   }, [members, payments, settings, membersReady, user, syncMemberStatuses]);
 
   useEffect(() => {
@@ -166,9 +240,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const createMember = useCallback(async (data: Omit<Member, "id" | "createdAt">) => addMember(data), []);
   const createMemberWithAuth = useCallback(
-    async (data: { name: string; loginId: string; password: string; contribution: number }) =>
-      addMemberWithAuth(data),
-    []
+    async (data: { name: string; loginId: string; password: string; contribution: number }) => {
+      const member = await addMemberWithAuth(data);
+      serverMembersRef.current = mergeMemberLists(serverMembersRef.current, [member]);
+      publishMembers();
+      void refreshMembersFromServer();
+      return member;
+    },
+    [publishMembers, refreshMembersFromServer]
   );
   const editMember = useCallback(async (id: string, data: Partial<Member>) => updateMember(id, data), []);
   const removeMember = useCallback(async (id: string) => deleteMember(id), []);

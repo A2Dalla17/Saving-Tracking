@@ -12,7 +12,6 @@ import { calculateMemberStats, calculateGroupStats } from "@/lib/calculations";
 import { getPayingMembers, filterPayingPayments } from "@/lib/member-status";
 import { resolveProfileMember } from "@/lib/resolve-profile-member";
 import { downloadMemberPdf, shareMemberPdf } from "@/lib/pdf";
-import { GroupAdminChat } from "@/components/shared/group-admin-chat";
 import { t } from "@/lib/somali";
 
 export function MyStatementPortal() {
@@ -141,7 +140,6 @@ export function MyStatementPortal() {
         </Card>
       )}
 
-      {user && <GroupAdminChat />}
     </>
   );
 }

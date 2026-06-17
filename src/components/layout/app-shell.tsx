@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar, MobileNav, LogoCorner, BrandBadgeMobile } from "@/components/layout/sidebar";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { useData } from "@/lib/hooks/use-data";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { t } from "@/lib/somali";
 
@@ -37,7 +36,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const hydrated = useHydrated();
   const { user, loading: authLoading } = useAuth();
-  const { loading: dataLoading } = useData();
 
   const isLoginPage = pathname === "/login";
 
@@ -54,7 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return <LoginShell>{children}</LoginShell>;
   }
 
-  if (!hydrated || authLoading || !user || dataLoading) {
+  if (!hydrated || authLoading || !user) {
     return (
       <AppFrame pathname={pathname}>
         <p className="text-muted-foreground py-4">{t.common.loading}</p>

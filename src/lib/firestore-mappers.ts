@@ -7,7 +7,7 @@ import type {
   Payment,
   Savings,
 } from "@/types";
-import { loginIdToEmail, normalizeLoginId } from "@/lib/member-auth";
+import { loginIdToEmail, normalizeLoginId } from "@/lib/member-credentials";
 
 export function rowToMember(row: Record<string, unknown>): Member {
   const docId = (row.id as string) || "";
@@ -89,18 +89,21 @@ export function newMemberToFirestore(input: {
   createdAt: string;
 }) {
   const loginId = normalizeLoginId(input.loginId);
-  return {
+  const email = loginIdToEmail(loginId);
+  return memberToRow({
+    id: input.uid,
+    uid: input.uid,
     name: input.name,
     loginId,
-    contributionAmount: input.contribution,
-    paid: false,
-    uid: input.uid,
-    createdAt: input.createdAt,
-    email: loginIdToEmail(loginId),
-    join_date: input.joinDate,
-    login_active: true,
+    email,
+    joinDate: input.joinDate,
+    monthlyFee: input.contribution,
+    annualTarget: input.contribution * 12,
+    loginActive: true,
     status: "active",
-  };
+    paid: false,
+    createdAt: input.createdAt,
+  });
 }
 
 export function rowToPayment(row: Record<string, unknown>): Payment {

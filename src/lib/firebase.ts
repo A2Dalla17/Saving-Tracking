@@ -5,11 +5,13 @@ import { getAuth as createAuth, type Auth } from "firebase/auth";
 import {
   initializeFirestore,
   getFirestore,
-  memoryLocalCache,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   enableNetwork,
+  waitForPendingWrites,
   type Firestore,
 } from "firebase/firestore";
-import { firebasePublicConfig as firebaseConfig } from "@/lib/firebase-public-config";
+import { firebasePublicConfig as firebaseConfig, firestoreDatabaseId } from "@/lib/firebase-public-config";
 
 export { firebasePublicConfig, firebasePublicConfig as firebaseConfig } from "@/lib/firebase-public-config";
 
@@ -19,10 +21,12 @@ let dbInstance: Firestore | undefined;
 let networkReady: Promise<void> | undefined;
 
 const FIRESTORE_SETTINGS = {
-  localCache: memoryLocalCache(),
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   experimentalAutoDetectLongPolling: true,
   experimentalForceLongPolling: true,
 } as const;
+
+const FIRESTORE_DATABASE_ID = firestoreDatabaseId;
 
 function initFirebaseClient(): void {
   if (typeof window === "undefined") return;
@@ -34,14 +38,14 @@ function initFirebaseClient(): void {
 
   if (!dbInstance) {
     try {
-      dbInstance = initializeFirestore(app, FIRESTORE_SETTINGS);
+      dbInstance = initializeFirestore(app, FIRESTORE_SETTINGS, FIRESTORE_DATABASE_ID);
     } catch {
       // Hot reload — reuse instance created earlier in this session.
-      dbInstance = getFirestore(app);
+      dbInstance = getFirestore(app, FIRESTORE_DATABASE_ID);
     }
     networkReady = enableNetwork(dbInstance)
       .then(() => {
-        console.log("Firebase Firestore online:", firebaseConfig.projectId);
+        console.log("Firebase Firestore online:", firebaseConfig.projectId, "db:", FIRESTORE_DATABASE_ID);
       })
       .catch((err) => {
         console.warn("Firestore enableNetwork warning:", err);

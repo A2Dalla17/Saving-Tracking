@@ -11,7 +11,6 @@ import { useData } from "@/lib/hooks/use-data";
 import { calculateGroupStats, buildSavingsChartData } from "@/lib/calculations";
 import { getPayingMembers, filterPayingPayments } from "@/lib/member-status";
 import { PageLoading } from "@/components/shared/page-status";
-import { GroupAdminChat } from "@/components/shared/group-admin-chat";
 import { t } from "@/lib/somali";
 
 export default function DashboardPage() {
@@ -81,8 +80,6 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-
-        <GroupAdminChat />
     </PageLayout>
   );
 }

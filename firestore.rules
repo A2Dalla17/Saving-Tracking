@@ -1,8 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Authenticated users only (Email/Password + Google via Firebase Auth).
+    // Deploy: Firebase Console → Firestore → Rules, or: npx firebase deploy --only firestore:rules
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }

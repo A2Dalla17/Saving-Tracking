@@ -57,7 +57,7 @@ export function AdminPanel() {
   };
 
   return (
-    <Tabs defaultValue="ledger" className="flex flex-col gap-4">
+    <Tabs defaultValue="members" className="flex flex-col gap-4">
       <TabsList className="admin-wa-nav-list">
         {adminNavItems.map(({ value, label, icon: Icon }) => (
           <TabsTrigger key={value} value={value} className="admin-wa-nav-item">

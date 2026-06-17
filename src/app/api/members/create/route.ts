@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_SETTINGS } from "@/lib/constants";
-import { getFirebaseAdminAuth, getFirestoreAdmin, getFirebaseAdminConfigError } from "@/lib/firebase-admin";
+import {
+  getFirebaseAdminAuth,
+  getFirestoreAdmin,
+  getFirebaseAdminConfigError,
+  getFirebaseAdminInitError,
+} from "@/lib/firebase-admin";
 import {
   isValidMemberLoginId,
   loginIdToEmail,
@@ -12,6 +17,11 @@ export interface CreateMemberBody {
   loginId: string;
   password: string;
   contribution: number;
+}
+
+function formatError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
 /** Admin: create Firebase Auth user + Firestore members/{uid} in one step. */
@@ -36,18 +46,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Lacagta bishii waa inay ka weyn tahay 0" }, { status: 400 });
     }
 
-    const auth = getFirebaseAdminAuth();
-    const db = getFirestoreAdmin();
+    // --- Admin SDK init (with full error logging) ---
+    let auth;
+    let db;
+    try {
+      auth = getFirebaseAdminAuth();
+      db = getFirestoreAdmin();
+    } catch (initErr) {
+      console.error("members/create: Admin SDK init threw:", initErr);
+      const message =
+        formatError(initErr) ||
+        getFirebaseAdminConfigError() ||
+        "Firebase Admin initialization failed";
+      return NextResponse.json({ error: message, stage: "admin-init" }, { status: 503 });
+    }
+
     if (!auth || !db) {
-      const message = getFirebaseAdminConfigError() ?? "Firebase Admin ma diyaar ahayn";
-      console.error("members/create:", message);
-      return NextResponse.json({ error: message }, { status: 503 });
+      const message =
+        getFirebaseAdminConfigError() ||
+        formatError(getFirebaseAdminInitError()) ||
+        "Firebase Admin ma diyaar ahayn";
+      console.error("members/create: Admin SDK unavailable:", message);
+      return NextResponse.json({ error: message, stage: "admin-config" }, { status: 503 });
     }
 
     const email = loginIdToEmail(loginId);
     const createdAt = new Date().toISOString();
     const joinDate = DEFAULT_SETTINGS.groupStartDate;
 
+    // --- Firebase Auth user ---
     let uid: string;
     try {
       const user = await auth.createUser({
@@ -57,13 +84,19 @@ export async function POST(request: NextRequest) {
         emailVerified: true,
       });
       uid = user.uid;
+      console.log("members/create: Auth user created", { uid, email });
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
       if (code === "auth/email-already-exists") {
         const existing = await auth.getUserByEmail(email);
         uid = existing.uid;
+        console.log("members/create: Auth user already exists, reusing uid", uid);
       } else {
-        throw err;
+        console.error("members/create: Auth createUser FAILED — full error:", err);
+        return NextResponse.json(
+          { error: `Auth user lama abuuri karo: ${formatError(err)}`, stage: "auth-create" },
+          { status: 500 }
+        );
       }
     }
 
@@ -82,19 +115,48 @@ export async function POST(request: NextRequest) {
       status: "active",
     };
 
-    await db.collection("members").doc(uid).set(memberDoc, { merge: true });
-    console.log("members/create: Firestore write OK", { uid, loginId });
+    // --- Firestore write (with full error logging) ---
+    try {
+      await db.collection("members").doc(uid).set(memberDoc, { merge: true });
+      const verify = await db.collection("members").doc(uid).get();
+      if (!verify.exists) {
+        throw new Error("Firestore document not found after write");
+      }
+      console.log("members/create: Firestore write OK", { uid, loginId, path: `members/${uid}` });
+    } catch (firestoreErr) {
+      console.error("members/create: Firestore write FAILED — full error:", firestoreErr);
+      if (firestoreErr instanceof Error && firestoreErr.stack) {
+        console.error("members/create: Firestore stack:", firestoreErr.stack);
+      }
+      const errText = formatError(firestoreErr);
+      const notFound = errText.includes("NOT_FOUND");
+      return NextResponse.json(
+        {
+          error: notFound
+            ? "Firestore database lama helin — Firebase Console → Firestore → Create database (project ac7-group)"
+            : `Firestore kaydin wuu fashilmay: ${errText}`,
+          stage: "firestore-write",
+          uid,
+        },
+        { status: notFound ? 503 : 500 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,
+      success: true,
       id: uid,
       uid,
       email,
       loginId,
+      message: "Xubinta Auth + Firestore waa la kaydiyay",
     });
   } catch (err) {
-    console.error("members/create error:", err);
-    const message = err instanceof Error ? err.message : "Xubin lama abuuri karo";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("members/create: unexpected error — full error:", err);
+    if (err instanceof Error && err.stack) {
+      console.error("members/create: stack:", err.stack);
+    }
+    const message = formatError(err);
+    return NextResponse.json({ error: message, stage: "unknown" }, { status: 500 });
   }
 }

@@ -14,8 +14,9 @@ import {
   limit,
   onSnapshot,
   writeBatch,
+  waitForPendingWrites,
 } from "firebase/firestore";
-import { db, ensureFirestoreOnline } from "@/lib/firebase";
+import { db, ensureFirestoreOnline, getClientAuth } from "@/lib/firebase";
 import { isFirebaseConfigured } from "./firestore-config";
 import {
   rowToMember,
@@ -32,7 +33,6 @@ import {
   rowToSavings,
   savingsToRow,
   paymentToSavings,
-  newMemberToFirestore,
 } from "./firestore-mappers";
 import {
   DEFAULT_SETTINGS,
@@ -44,7 +44,7 @@ import {
 import { hashPassword } from "./auth";
 import { isAdminMember } from "./member-status";
 import { isCurrentMonthPaid, paymentBelongsToMember, findCurrentMonthPayment, getCurrentMonthKey, formatMonthKey } from "./calculations";
-import { createMemberFirebaseAuth, isValidMemberLoginId, loginIdToEmail, normalizeLoginId } from "./member-auth";
+import { isValidMemberLoginId, loginIdToEmail, normalizeLoginId } from "./member-auth";
 import { ensureAdminFirebaseSession } from "./admin-firebase-auth";
 import { generateId } from "./utils";
 import type { Member, Payment, AppSettings, Announcement, ChatMessage, ArchivedMemberRecord, Savings } from "@/types";
@@ -57,13 +57,20 @@ function requireFirestore(): void {
   }
 }
 
-/** Sign in admin Firebase account before writes (rules may require auth in production). */
+/** Require Firebase Auth before client Firestore writes (rules: request.auth != null). */
 async function ensureFirestoreWriteAccess(): Promise<void> {
   requireFirestore();
   await ensureFirestoreOnline();
+
+  if (getClientAuth().currentUser) {
+    return;
+  }
+
   const result = await ensureAdminFirebaseSession();
   if (!result.success) {
-    console.warn("Admin Firebase session unavailable, attempting Firestore write anyway:", result.error);
+    const message = result.error ?? "Fadlan soo gal Firebase Auth";
+    console.error("Firestore write blocked — not authenticated:", message);
+    throw new Error(`Firebase Auth loo baahan yahay Firestore: ${message}`);
   }
 }
 
@@ -90,12 +97,18 @@ async function firestoreSetMemberByUid(uid: string, data: Record<string, unknown
   console.log("Writing to Firestore", { id: uid, ...data });
   try {
     await ensureFirestoreWriteAccess();
-    await setDoc(doc(db(), "members", uid), data);
+    const memberRef = doc(db(), "members", uid);
+    await setDoc(memberRef, data, { merge: true });
+    await waitForPendingWrites(db());
+    const verify = await getDoc(memberRef);
+    if (!verify.exists()) {
+      throw new Error("Firestore kaydin wuu fashilmay — xubin lama kaydin");
+    }
     console.log("Firestore success", uid);
     return uid;
   } catch (err) {
     console.error("Firestore FAILED", err);
-    throw err;
+    throw err instanceof Error ? err : new Error("Firestore kaydin wuu fashilmay");
   }
 }
 
@@ -104,28 +117,64 @@ async function createMemberViaServerApi(input: {
   loginId: string;
   password: string;
   contribution: number;
-}): Promise<{ id: string; uid: string } | null> {
+}): Promise<{ id: string; uid: string }> {
+  const res = await fetch("/api/members/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    success?: boolean;
+    id?: string;
+    uid?: string;
+    error?: string;
+    stage?: string;
+  };
+
+  if (!res.ok) {
+    const message = data.error ?? `Server error ${res.status}`;
+    console.error("Server member create FAILED:", { status: res.status, stage: data.stage, message });
+    throw new Error(message);
+  }
+
+  if (!data.uid && !data.id) {
+    console.error("Server member create FAILED: no uid in response", data);
+    throw new Error(data.error ?? "Server API ma soo celin uid");
+  }
+
+  const uid = data.uid ?? data.id!;
+  console.log("Server created Auth + Firestore member:", uid);
+  return { id: uid, uid };
+}
+
+/** Load all members via Admin SDK API (works when client Firestore read is blocked). */
+export async function fetchMembersFromServerApi(): Promise<Member[]> {
+  const res = await fetch("/api/members/list", { cache: "no-store" });
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    members?: Array<Partial<Member> & { id: string; name: string }>;
+    error?: string;
+  };
+
+  if (!res.ok) {
+    throw new Error(data.error ?? `Server error ${res.status}`);
+  }
+
+  const rows = data.members ?? [];
+  return rows
+    .map((row) => normalizeMember(rowToMember(row as Record<string, unknown>)))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+async function resolveMembersForPayment(): Promise<Member[]> {
+  const client = await fetchAllMembers();
+  if (client.length > 0) return client;
   try {
-    const res = await fetch("/api/members/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      const message = data.error ?? `Server error ${res.status}`;
-      console.warn("Server member create failed:", message);
-      if (res.status === 503) {
-        throw new Error(message);
-      }
-      return null;
-    }
-    const data = (await res.json()) as { id: string; uid: string };
-    console.log("Server created Auth + Firestore member:", data.id);
-    return data;
-  } catch (err) {
-    console.warn("Server member create unavailable:", err);
-    return null;
+    return await fetchMembersFromServerApi();
+  } catch {
+    return client;
   }
 }
 
@@ -368,7 +417,13 @@ export function subscribeMembers(callback: (members: Member[]) => void): Unsubsc
       callback(members);
     },
     (err) => {
+      const code = (err as { code?: string })?.code;
       console.error("FIRESTORE members fetch error:", err);
+      if (code === "permission-denied") {
+        console.error(
+          "Firestore RULES blocked read. Update Firebase Console → Firestore → Rules to: allow read, write: if request.auth != null"
+        );
+      }
       callback([]);
     }
   );
@@ -500,32 +555,21 @@ export async function addMemberWithAuth(input: AddMemberWithAuthInput): Promise<
 
   await ensureFirestoreWriteAccess();
 
-  const existing = await fetchAllMembers();
+  let existing: Member[] = [];
+  try {
+    existing = await fetchMembersFromServerApi();
+  } catch {
+    existing = await fetchAllMembers();
+  }
   if (isLoginIdTakenLocal(existing, loginId)) throw new Error("Login ID-kan horey ayaa loo isticmaalay");
 
   const createdAt = new Date().toISOString();
   const settings = await fetchSettingsRow();
   const joinDate = settings.groupStartDate || DEFAULT_SETTINGS.groupStartDate;
 
-  // 1) Server: Firebase Auth user + Firestore members/{uid} (best — syncs Auth list + DB)
+  // Server API: Firebase Auth user + Firestore members/{uid} (Admin SDK)
   const serverResult = await createMemberViaServerApi({ name, loginId, password, contribution });
-
-  let uid: string;
-  if (serverResult) {
-    uid = serverResult.uid;
-  } else {
-    // 2) Client fallback: Auth via secondary app + Firestore doc id = uid
-    uid = await createMemberFirebaseAuth(loginId, password);
-    const firestoreRow = newMemberToFirestore({
-      name,
-      loginId,
-      contribution,
-      uid,
-      joinDate,
-      createdAt,
-    });
-    await firestoreSetMemberByUid(uid, firestoreRow);
-  }
+  const uid = serverResult.uid;
 
   return normalizeMember({
     id: uid,
@@ -775,7 +819,7 @@ export async function addPayment(payment: Omit<Payment, "id">): Promise<Payment>
     await setDoc(doc(db(), "payments", newPayment.id), paymentRow);
     console.log("Firestore success", newPayment.id);
 
-    const members = await fetchAllMembers();
+    const members = await resolveMembersForPayment();
     const member = members.find(
       (m) => m.id === payment.memberId || m.uid === payment.memberId
     );

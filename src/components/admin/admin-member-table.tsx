@@ -57,6 +57,13 @@ export function AdminMemberTable() {
   const [newContribution, setNewContribution] = useState(settings.monthlyFee);
 
   const payingMembers = useMemo(() => members.filter((m) => !isAdminMember(m) && m.status !== "removed"), [members]);
+  const tickableMembers = useMemo(
+    () =>
+      [...members]
+        .filter((m) => !isAdminMember(m) && m.status !== "removed")
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [members]
+  );
   const groupStats = useMemo(
     () => calculateGroupStats(payingMembers, payments, settings),
     [payingMembers, payments, settings]
@@ -110,8 +117,8 @@ export function AdminMemberTable() {
   };
 
   const displayMembers = useMemo(
-    () => members.map((m) => ({ ...m, ...drafts[m.id] })),
-    [members, drafts]
+    () => tickableMembers.map((m) => ({ ...m, ...drafts[m.id] })),
+    [tickableMembers, drafts]
   );
 
   const hasDrafts = Object.keys(drafts).length > 0 || Object.keys(passwordDrafts).length > 0;
@@ -325,7 +332,7 @@ export function AdminMemberTable() {
           <div>
             <CardTitle>{t.admin.memberTable}</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              {t.admin.addMemberHint} · {members.length} {t.members.title.toLowerCase()} (Firestore)
+              {tickableMembers.length} xubnood — {t.ledger.tickPayment} / {t.ledger.undoPayment}
             </p>
           </div>
           <Button size="sm" onClick={() => setAddOpen(true)}>
@@ -349,7 +356,16 @@ export function AdminMemberTable() {
               </tr>
             </thead>
             <tbody>
-              {displayMembers.map((m) => (
+              {displayMembers.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-10 text-center text-muted-foreground text-sm">
+                    {t.members.noMembers}
+                    <br />
+                    <span className="text-xs">{t.admin.addMemberHint}</span>
+                  </td>
+                </tr>
+              ) : (
+              displayMembers.map((m) => (
                 <tr key={m.id} className="border-b border-border text-card-foreground">
                   <td className="py-2 px-2">
                     <Input
@@ -489,7 +505,8 @@ export function AdminMemberTable() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
           <Button onClick={handleSave} disabled={saving || !hasDrafts} className="mt-4" variant="gold">
@@ -559,7 +576,7 @@ export function AdminMemberTable() {
                 {t.common.cancel}
               </Button>
               <Button type="submit" variant="gold" disabled={adding}>
-                {adding ? t.common.loading : t.members.addMember}
+                {adding ? t.common.busy : t.members.addMember}
               </Button>
             </DialogFooter>
           </form>
