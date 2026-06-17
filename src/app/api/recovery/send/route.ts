@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ADMIN_EMAIL, RECOVERY_CODE_EXPIRY_MS } from "@/lib/constants";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -14,9 +14,9 @@ export async function POST() {
   const code = generateCode();
   const expiresAt = Date.now() + RECOVERY_CODE_EXPIRY_MS;
 
-  const supabase = getSupabaseAdmin();
-  if (supabase) {
-    await supabase.from("recovery_codes").upsert({
+  const db = getFirestoreAdmin();
+  if (db) {
+    await db.collection("recovery_codes").doc("current").set({
       id: "current",
       code,
       expires_at: expiresAt,

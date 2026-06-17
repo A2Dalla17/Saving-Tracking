@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { importLocalDataToSupabase, type LocalCloudPayload } from "@/lib/supabase-seed";
+import { importLocalDataToFirestore, type LocalCloudPayload } from "@/lib/firestore-seed";
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as LocalCloudPayload;
-    const result = await importLocalDataToSupabase(body);
+    const result = await importLocalDataToFirestore(body);
 
     if (result.reason === "admin-missing") {
       return NextResponse.json(
-        { error: "SUPABASE_SERVICE_ROLE_KEY ma jiro Vercel-ka" },
+        { error: "Firebase admin credentials ma jiraan Vercel-ka" },
         { status: 503 }
       );
     }

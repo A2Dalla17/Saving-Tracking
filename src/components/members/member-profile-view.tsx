@@ -2,9 +2,8 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Send, AlertTriangle, User, Mail, Phone, Target, Trash2, Camera, X } from "lucide-react";
+import { AlertTriangle, User, Mail, Phone, Target, Camera, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
@@ -14,6 +13,7 @@ import { useAuth } from "@/lib/hooks/use-auth";
 import { calculateMemberStats, calculateGroupStats } from "@/lib/calculations";
 import { getStatusLabel } from "@/lib/member-status";
 import { processProfileImage } from "@/lib/avatar";
+import { GroupAdminChat } from "@/components/shared/group-admin-chat";
 import { t } from "@/lib/somali";
 import type { Member } from "@/types";
 
@@ -22,33 +22,17 @@ interface MemberProfileViewProps {
 }
 
 export function MemberProfileView({ member }: MemberProfileViewProps) {
-  const { payments, settings, chats, sendChat, removeChat, editMember } = useData();
+  const { payments, settings, editMember } = useData();
   const { user } = useAuth();
-  const [message, setMessage] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const groupStats = calculateGroupStats([member], payments, settings);
   const stats = calculateMemberStats(member, payments, groupStats.totalSavings, settings);
-  const memberChats = chats.filter((c) => c.memberId === member.id);
-  const isOwnProfile = user?.memberId === member.id;
-  const isAdmin = user?.isAdmin;
-
-  const handleSend = async () => {
-    if (!message.trim()) return;
-    await sendChat(member.id, message.trim(), isAdmin ?? false);
-    setMessage("");
-  };
-
-  const handleDeleteChat = async (chatId: string) => {
-    if (!confirm(t.profile.confirmDeleteChat)) return;
-    try {
-      await removeChat(chatId);
-      toast.success(t.profile.chatDeleted);
-    } catch {
-      toast.error(t.common.error);
-    }
-  };
+  const isOwnProfile =
+    user?.memberId === member.id ||
+    user?.memberId === member.uid ||
+    (user?.email && member.email?.toLowerCase() === user.email.toLowerCase());
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,7 +64,7 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
   };
 
   return (
-    <>
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <div className="flex items-center gap-4">
@@ -186,56 +170,7 @@ export function MemberProfileView({ member }: MemberProfileViewProps) {
         </CardContent>
       </Card>
 
-      {(isOwnProfile || isAdmin) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t.profile.chat}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="max-h-48 overflow-y-auto space-y-2">
-              {memberChats.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t.profile.noChat}</p>
-              ) : (
-                memberChats.map((c) => (
-                  <div
-                    key={c.id}
-                    className={`p-3 rounded-xl text-sm max-w-[85%] ${
-                      c.fromAdmin ? "bg-muted border border-border ml-auto text-right" : "bg-muted"
-                    }`}
-                  >
-                    <p>{c.message}</p>
-                    <div className={`flex items-center gap-2 mt-1 ${c.fromAdmin ? "justify-end" : ""}`}>
-                  <p className="text-xs text-muted-foreground">
-                        {new Date(c.sentAt).toLocaleString("so-SO")}
-                      </p>
-                      {isAdmin && c.fromAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-card-foreground hover:text-card-foreground"
-                          onClick={() => handleDeleteChat(c.id)}
-                          title={t.profile.deleteChat}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder={t.profile.chatPlaceholder}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              />
-              <Button onClick={handleSend} size="icon"><Send className="h-4 w-4" /></Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </>
+      <GroupAdminChat />
+    </div>
   );
 }

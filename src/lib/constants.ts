@@ -6,6 +6,10 @@ export const GROUP_START_DATE = new Date(2026, 5, 1);
 export const ADMIN_PIN = "1596";
 export const ADMIN_EMAIL = "Ghaalabh10@gmail.com";
 export const ADMIN_PASSWORD = "Hooyo114";
+/** Firebase Auth account used for Firestore admin writes after PIN unlock. */
+export const ADMIN_FIREBASE_EMAIL = "admin@ac7group.app";
+export const ADMIN_FIREBASE_PASSWORD = ADMIN_PASSWORD;
+export const GROUP_CHAT_ID = "ac7-group-chat";
 export const GROUP_NAME = "AC7 Group";
 export const GROUP_NAME_SOMALI = "Aragti Cad";
 export const MAX_PIN_ATTEMPTS = 5;

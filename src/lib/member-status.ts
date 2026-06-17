@@ -1,8 +1,12 @@
 import type { Member, MemberStatus, Payment } from "@/types";
-import { ADMIN_EMAIL, REMOVAL_MISS_THRESHOLD, WARNING_MISS_THRESHOLD } from "./constants";
+import { ADMIN_EMAIL, ADMIN_FIREBASE_EMAIL, REMOVAL_MISS_THRESHOLD, WARNING_MISS_THRESHOLD } from "./constants";
 
 export function isAdminMember(member: Member): boolean {
-  return member.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return (
+    member.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ||
+    member.email?.toLowerCase() === ADMIN_FIREBASE_EMAIL.toLowerCase() ||
+    member.name.trim().toLowerCase() === "maamulaha"
+  );
 }
 
 export function getPayingMembers(members: Member[]): Member[] {

@@ -79,7 +79,13 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-white/[0.08]">
+      <div className="px-4 py-4 border-t border-white/[0.08] space-y-3">
+        <div className="flex items-center gap-3 px-2">
+          <div className="relative h-10 w-10 shrink-0 rounded-xl bg-white/10 p-1.5">
+            <Image src="/logo.png" alt="AC7 Group" fill className="object-contain" />
+          </div>
+          <p className="text-xs text-white/70 truncate">{user?.name}</p>
+        </div>
         <button
           onClick={logout}
           className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors"
@@ -182,7 +188,26 @@ export function MobileNav() {
   );
 }
 
-export function LogoCorner({ showOnMobile = false }: { showOnMobile?: boolean }) {
+export function BrandBadgeMobile() {
+  return (
+    <div
+      className="brand-badge-mobile lg:hidden pointer-events-none"
+      aria-hidden="true"
+    >
+      <div className="relative h-9 w-9 rounded-xl bg-[#070f1f]/90 border border-white/15 p-1.5 shadow-lg">
+        <Image src="/logo.png" alt="" fill className="object-contain" />
+      </div>
+    </div>
+  );
+}
+
+export function LogoCorner({
+  showOnMobile = false,
+  compact = false,
+}: {
+  showOnMobile?: boolean;
+  compact?: boolean;
+}) {
   return (
     <div
       className={cn(
@@ -190,7 +215,12 @@ export function LogoCorner({ showOnMobile = false }: { showOnMobile?: boolean })
         showOnMobile ? "block" : "hidden lg:block"
       )}
     >
-      <div className="relative h-16 w-16 sm:h-20 sm:w-20 opacity-90 hover:opacity-100 transition-opacity drop-shadow-lg">
+      <div
+        className={cn(
+          "login-hero-logo relative opacity-90 hover:opacity-100 transition-opacity drop-shadow-lg",
+          compact ? "h-12 w-12 sm:h-14 sm:w-14" : "h-16 w-16 sm:h-20 sm:w-20"
+        )}
+      >
         <Image src="/logo.png" alt="AC7" fill className="object-contain" priority />
       </div>
     </div>

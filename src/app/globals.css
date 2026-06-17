@@ -31,13 +31,14 @@
   --ring: #64748b;
   --accent-bright: #ffffff;
 
-  --card: #e3e6eb;
-  --card-elevated: #eceff3;
-  --card-foreground: #243041;
-  --muted: rgba(36, 48, 65, 0.08);
-  --muted-foreground: rgba(36, 48, 65, 0.58);
-  --border: rgba(36, 48, 65, 0.12);
-  --input-bg: #eceff3;
+  --content-bg: #eef1f5;
+  --card: #ffffff;
+  --card-elevated: #ffffff;
+  --card-foreground: #0f2744;
+  --muted: rgba(15, 39, 68, 0.06);
+  --muted-foreground: rgba(15, 39, 68, 0.62);
+  --border: rgba(15, 39, 68, 0.12);
+  --input-bg: #ffffff;
 
   --destructive: #243041;
   --success: #243041;
@@ -80,11 +81,13 @@
   html {
     background-color: #0a1628;
     color: #ffffff;
+    overflow-x: hidden;
   }
 
   body {
     background-color: transparent;
     color: #ffffff;
+    overflow-x: hidden;
     font-family: var(--font-roboto), "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -103,7 +106,7 @@
   select,
   textarea {
     font-size: 16px;
-    caret-color: #243041;
+    caret-color: #0f2744;
   }
 
   @media (min-width: 1024px) {
@@ -166,6 +169,20 @@
   z-index: 1;
   min-height: 100vh;
   width: 100%;
+  max-width: 100vw;
+  background-color: var(--content-bg);
+  color: var(--card-foreground);
+}
+
+.app-page-shell {
+  width: 100%;
+}
+
+.app-content-layer {
+  --foreground: #0f2744;
+  --card-foreground: #0f2744;
+  --muted-foreground: rgba(15, 39, 68, 0.62);
+  color: #0f2744;
 }
 
 .app-sidebar-fixed {
@@ -180,7 +197,28 @@
 
 .logo-corner-fixed {
   position: fixed !important;
-  z-index: 50 !important;
+  z-index: 30 !important;
+  pointer-events: none;
+}
+
+/* App logo replaces Next.js dev "N" badge on mobile */
+.brand-badge-mobile {
+  position: fixed;
+  left: 0.75rem;
+  bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  z-index: 45;
+}
+
+/* Login — logo on blue background (white box, 8px corners) */
+.login-hero-logo {
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+/* Login — logo inside white card: hide PNG white, show moon + star only */
+.login-card-logo img {
+  mix-blend-mode: multiply;
 }
 
 /* ── Surface logic: light grey box = soft dark text, blue box = white text ── */
@@ -196,15 +234,15 @@
 }
 
 .surface-light {
-  --foreground: #243041;
-  --card-foreground: #243041;
-  --muted-foreground: rgba(36, 48, 65, 0.58);
-  --destructive: #243041;
-  --success: #243041;
-  --accent: #243041;
-  --border: rgba(36, 48, 65, 0.12);
-  --muted: rgba(36, 48, 65, 0.08);
-  color: #243041;
+  --foreground: #0f2744;
+  --card-foreground: #0f2744;
+  --muted-foreground: rgba(15, 39, 68, 0.62);
+  --destructive: #0f2744;
+  --success: #0f2744;
+  --accent: #0f2744;
+  --border: rgba(15, 39, 68, 0.12);
+  --muted: rgba(15, 39, 68, 0.06);
+  color: #0f2744;
 }
 
 .page-gradient,
@@ -221,13 +259,13 @@
 
 .bg-card,
 .surface-light {
-  --foreground: #243041;
-  --card-foreground: #243041;
-  --muted-foreground: rgba(36, 48, 65, 0.58);
-  --destructive: #243041;
-  --success: #243041;
-  --accent: #243041;
-  color: #243041;
+  --foreground: #0f2744;
+  --card-foreground: #0f2744;
+  --muted-foreground: rgba(15, 39, 68, 0.62);
+  --destructive: #0f2744;
+  --success: #0f2744;
+  --accent: #0f2744;
+  color: #0f2744;
 }
 
 .surface-light input,
@@ -236,7 +274,7 @@
 .bg-card input,
 .bg-card select,
 .bg-card textarea {
-  caret-color: #243041;
+  caret-color: #0f2744;
 }
 
 .surface-dark input,
@@ -245,26 +283,10 @@
   caret-color: #ffffff;
 }
 
-/* Buttons on blue areas use soft grey; on cards invert to dark */
-.surface-dark .bg-white.text-black,
-.page-gradient .bg-white.text-black {
-  background-color: var(--card-elevated);
-  color: #243041;
-}
-
-.surface-light .bg-white.text-black,
-.bg-card .bg-white.text-black {
-  background-color: #000000;
-  color: #ffffff;
-}
-
-.surface-light .bg-white.text-black:hover,
-.bg-card .bg-white.text-black:hover {
-  background-color: rgba(0, 0, 0, 0.88);
-}
-
+/* Primary buttons — black on content cards */
 .surface-light .bg-black.text-white,
-.bg-card .bg-black.text-white {
+.bg-card .bg-black.text-white,
+.app-content-layer .bg-black.text-white {
   background-color: #000000;
   color: #ffffff;
 }
@@ -344,7 +366,17 @@
 
 .page-header-bar {
   background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(15, 39, 68, 0.12);
+  color: #0f2744;
+}
+
+.page-header-bar .text-foreground,
+.page-header-bar h1 {
+  color: #0f2744;
+}
+
+.page-header-bar .text-muted-foreground {
+  color: rgba(15, 39, 68, 0.62);
 }
 
 .page-alerts {
@@ -352,6 +384,8 @@
   flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1rem;
+  position: relative;
+  z-index: 10;
 }
 
 .page-content {
@@ -359,6 +393,292 @@
   flex-direction: column;
   gap: 1rem;
   width: 100%;
+  position: relative;
+  z-index: 5;
+}
+
+/* Plum accent boxes — ogeysiis, chat */
+.alert-box-plum {
+  --foreground: #ffffff;
+  --card-foreground: #ffffff;
+  --muted-foreground: rgba(255, 255, 255, 0.78);
+  --border: rgba(255, 255, 255, 0.22);
+  background: #690957;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.alert-box-plum.surface-light,
+.bg-card.alert-box-plum,
+.surface-light.alert-box-plum {
+  --foreground: #ffffff;
+  --card-foreground: #ffffff;
+  --muted-foreground: rgba(255, 255, 255, 0.78);
+  background: #690957 !important;
+  background-color: #690957 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+.alert-box-plum label,
+.alert-box-plum .text-muted-foreground {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.alert-box-plum input,
+.alert-box-plum textarea {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #0f2744;
+  caret-color: #0f2744;
+}
+
+.alert-box-plum .alert-box-dismiss {
+  color: #ffffff;
+}
+
+.alert-box-plum .alert-box-dismiss:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+}
+
+/* Ghost/outline buttons on colored boxes */
+.alert-box-plum button[class*="hover:bg-"]:hover:not(:disabled),
+.alert-box-orange button[class*="hover:bg-"]:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+}
+
+.alert-box-plum .chat-bubble-admin {
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Green chat box — profile admin chat */
+.alert-box-chat {
+  --foreground: #ffffff;
+  --card-foreground: #ffffff;
+  --muted-foreground: rgba(255, 255, 255, 0.78);
+  --border: rgba(255, 255, 255, 0.22);
+  background: #096909;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.alert-box-chat.surface-light,
+.bg-card.alert-box-chat,
+.surface-light.alert-box-chat {
+  --foreground: #ffffff;
+  --card-foreground: #ffffff;
+  --muted-foreground: rgba(255, 255, 255, 0.78);
+  background: #096909 !important;
+  background-color: #096909 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+.alert-box-chat label,
+.alert-box-chat .text-muted-foreground {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.alert-box-chat input,
+.alert-box-chat textarea {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #0f2744;
+  caret-color: #0f2744;
+}
+
+.alert-box-chat .alert-box-dismiss {
+  color: #ffffff;
+}
+
+.alert-box-chat .alert-box-dismiss:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+}
+
+.alert-box-chat button[class*="hover:bg-"]:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+}
+
+.alert-box-chat .chat-bubble {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.alert-box-chat .chat-bubble-admin {
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Beige boxes — ogeysiisyada */
+.alert-box-beige {
+  --foreground: #3d3428;
+  --card-foreground: #0f2744;
+  --muted-foreground: rgba(15, 39, 68, 0.62);
+  --border: rgba(160, 130, 90, 0.35);
+  background: linear-gradient(135deg, #f7f2ea 0%, #e8dcc8 100%);
+  border: 1px solid rgba(160, 130, 90, 0.35);
+  color: #0f2744;
+}
+
+.alert-box-beige.surface-light,
+.bg-card.alert-box-beige,
+.surface-light.alert-box-beige {
+  --foreground: #0f2744;
+  --card-foreground: #0f2744;
+  --muted-foreground: rgba(15, 39, 68, 0.62);
+  background: linear-gradient(135deg, #f7f2ea 0%, #e8dcc8 100%) !important;
+  background-color: #f0e6d6 !important;
+  border-color: rgba(160, 130, 90, 0.35) !important;
+  color: #0f2744 !important;
+}
+
+.alert-box-beige label,
+.alert-box-beige .text-muted-foreground {
+  color: rgba(15, 39, 68, 0.72);
+}
+
+.alert-box-beige input,
+.alert-box-beige textarea {
+  background: #ffffff;
+  border-color: rgba(160, 130, 90, 0.35);
+  color: #0f2744;
+  caret-color: #0f2744;
+}
+
+.alert-box-beige .alert-box-dismiss {
+  color: #0f2744;
+}
+
+.alert-box-beige .alert-box-dismiss:hover {
+  background: rgba(15, 39, 68, 0.1) !important;
+  color: #0f2744 !important;
+}
+
+.alert-box-beige button[class*="hover:bg-"]:hover:not(:disabled) {
+  background-color: rgba(15, 39, 68, 0.1) !important;
+  color: #0f2744 !important;
+  border-color: rgba(15, 39, 68, 0.2) !important;
+}
+
+/* Calendar section — plum accent */
+.calendar-accent-card {
+  border-color: rgba(105, 9, 87, 0.35) !important;
+  overflow: hidden;
+}
+
+.calendar-accent-card .calendar-card-header {
+  background: #690957;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.calendar-accent-card .calendar-card-header .text-card-foreground,
+.calendar-accent-card .calendar-card-header h3,
+.calendar-accent-card .calendar-card-header svg {
+  color: #ffffff !important;
+}
+
+.calendar-accent-card .calendar-card-header .text-muted-foreground {
+  color: rgba(255, 255, 255, 0.78) !important;
+}
+
+.calendar-accent-card .calendar-day.has-payment {
+  background: rgba(105, 9, 87, 0.1);
+  border-color: rgba(105, 9, 87, 0.35);
+}
+
+.calendar-accent-card .calendar-payment-pill {
+  background: rgba(105, 9, 87, 0.15);
+  color: #690957;
+}
+
+.calendar-accent-card .calendar-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.calendar-accent-card .calendar-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  transform: scale(1.05);
+}
+
+.calendar-accent-card .calendar-nav-btn-primary {
+  background: #ffffff;
+  color: #690957;
+  border-color: #ffffff;
+}
+
+.calendar-accent-card .calendar-nav-btn-primary:hover {
+  background: #ffffff;
+  color: #690957;
+  transform: scale(1.06);
+}
+
+.calendar-day-number {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #000000;
+  line-height: 1.2;
+}
+
+.calendar-day.is-today {
+  border: 2px solid #000000 !important;
+  background: #f3f4f6 !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.calendar-day.is-today .calendar-day-number {
+  font-weight: 800;
+}
+
+/* Orange alert boxes — xusuusin bilaha */
+.alert-box-orange {
+  --foreground: #7c2d12;
+  --card-foreground: #7c2d12;
+  --muted-foreground: rgba(124, 45, 18, 0.68);
+  --border: rgba(234, 88, 12, 0.45);
+  background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+  border: 1px solid rgba(234, 88, 12, 0.45);
+  color: #7c2d12;
+}
+
+.alert-box-orange.surface-light,
+.bg-card.alert-box-orange {
+  --foreground: #7c2d12;
+  --card-foreground: #7c2d12;
+  --muted-foreground: rgba(124, 45, 18, 0.68);
+  background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+  color: #7c2d12;
+}
+
+.alert-box-dismiss {
+  color: #9a3412;
+}
+
+.alert-box-dismiss:hover {
+  background: rgba(234, 88, 12, 0.18);
+  color: #7c2d12;
 }
 
 .glass-header {
@@ -409,19 +729,25 @@
 
 .calendar-day {
   min-height: 90px;
-  background: var(--card);
-  border-color: rgba(36, 48, 65, 0.12);
-  color: #243041;
-  transition: all 0.2s ease;
+  background: #ffffff;
+  border-color: rgba(15, 39, 68, 0.12);
+  color: #0f2744;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  cursor: default;
+  position: relative;
 }
 
 .calendar-day:hover {
-  background: var(--card-elevated);
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgba(15, 39, 68, 0.14);
+  border-color: rgba(105, 9, 87, 0.4);
+  background: #ffffff;
+  z-index: 3;
 }
 
 .calendar-day.has-payment {
-  background: rgba(36, 48, 65, 0.08);
-  border-color: rgba(36, 48, 65, 0.18);
+  background: rgba(15, 39, 68, 0.06);
+  border-color: rgba(15, 39, 68, 0.18);
 }
 
 .admin-pill-btn {
@@ -594,6 +920,13 @@
   .admin-wa-nav-list {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
+}
+
+/* Hide Next.js dev "N" — app logo shown instead */
+[data-nextjs-dev-tools-button],
+[data-next-badge-root],
+button[aria-label="Open Next.js Dev Tools"] {
+  display: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

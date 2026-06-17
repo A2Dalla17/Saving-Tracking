@@ -9,18 +9,21 @@ import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { useData } from "@/lib/hooks/use-data";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { calculateMemberStats, calculateGroupStats } from "@/lib/calculations";
+import { getPayingMembers, filterPayingPayments } from "@/lib/member-status";
+import { resolveProfileMember } from "@/lib/resolve-profile-member";
 import { downloadMemberPdf, shareMemberPdf } from "@/lib/pdf";
 import { t } from "@/lib/somali";
 
 export function MyStatementPortal() {
   const { members, payments, settings } = useData();
   const { user } = useAuth();
-  const selectedId = user?.memberId ?? "";
 
-  const groupStats = calculateGroupStats(members, payments, settings);
-  const selectedMember = members.find((m) => m.id === selectedId);
+  const payingMembers = getPayingMembers(members);
+  const payingPayments = filterPayingPayments(members, payments);
+  const groupStats = calculateGroupStats(payingMembers, payingPayments, settings);
+  const selectedMember = resolveProfileMember(members, user);
   const memberStats = selectedMember
-    ? calculateMemberStats(selectedMember, payments, groupStats.totalSavings, settings)
+    ? calculateMemberStats(selectedMember, payingPayments, groupStats.totalSavings, settings)
     : null;
 
   const handleDownload = () => {
@@ -63,8 +66,10 @@ export function MyStatementPortal() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {selectedMember && (
+          {selectedMember ? (
             <p className="text-lg font-heading font-semibold text-card-foreground">{selectedMember.name}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t.myStatement.noMember}</p>
           )}
         </CardContent>
       </Card>

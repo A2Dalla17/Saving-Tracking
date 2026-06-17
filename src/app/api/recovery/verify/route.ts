@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 const globalStore = globalThis as typeof globalThis & {
   recoveryStore?: { code: string; expiresAt: number };
@@ -9,13 +9,14 @@ export async function POST(request: NextRequest) {
   const { code } = await request.json();
   const input = String(code ?? "").trim();
 
-  const supabase = getSupabaseAdmin();
+  const db = getFirestoreAdmin();
   let stored: { code: string; expiresAt: number } | null = null;
 
-  if (supabase) {
-    const { data } = await supabase.from("recovery_codes").select("*").eq("id", "current").maybeSingle();
-    if (data) {
-      stored = { code: data.code as string, expiresAt: Number(data.expires_at) };
+  if (db) {
+    const docSnap = await db.collection("recovery_codes").doc("current").get();
+    if (docSnap.exists) {
+      const data = docSnap.data();
+      stored = { code: data?.code as string, expiresAt: Number(data?.expires_at) };
     }
   } else {
     stored = globalStore.recoveryStore ?? null;
@@ -29,8 +30,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid code" }, { status: 401 });
   }
 
-  if (supabase) {
-    await supabase.from("recovery_codes").delete().eq("id", "current");
+  if (db) {
+    await db.collection("recovery_codes").doc("current").delete();
   } else {
     globalStore.recoveryStore = undefined;
   }

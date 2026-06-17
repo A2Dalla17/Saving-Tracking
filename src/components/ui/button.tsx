@@ -4,16 +4,22 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium select-none touch-manipulation transition-[background-color,border-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f2744]/40 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer active:brightness-95 motion-safe:hover:scale-[1.02]",
   {
     variants: {
       variant: {
-        default: "bg-white text-black shadow-sm hover:bg-white/90 hover:shadow-md",
-        destructive: "bg-white text-black shadow-sm hover:bg-white/90",
-        outline: "border border-border bg-card text-card-foreground shadow-sm hover:bg-muted",
-        secondary: "bg-muted text-card-foreground border border-border shadow-sm hover:bg-card",
-        ghost: "text-muted-foreground hover:bg-muted hover:text-card-foreground",
-        gold: "bg-black text-white shadow-sm hover:bg-black/90 font-semibold",
+        default:
+          "bg-black text-white shadow-sm hover:bg-[#222] hover:shadow-md font-semibold",
+        destructive:
+          "bg-black text-white shadow-sm hover:bg-[#222] hover:shadow-md font-semibold",
+        outline:
+          "border-2 border-[#0f2744]/30 bg-[#f4f6f8] text-[#0f2744] shadow-sm hover:bg-[#0f2744]/8 hover:border-[#0f2744]/45",
+        secondary:
+          "bg-[#eef1f5] text-[#0f2744] border-2 border-[#0f2744]/20 shadow-sm hover:bg-[#e4e8ee] hover:border-[#0f2744]/35",
+        ghost:
+          "text-[#0f2744] hover:bg-[#0f2744]/10",
+        gold:
+          "bg-black text-white shadow-sm hover:bg-[#222] hover:shadow-md font-semibold",
       },
       size: {
         default: "h-10 px-5 py-2",

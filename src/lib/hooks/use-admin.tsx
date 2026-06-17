@@ -2,23 +2,41 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { ADMIN_PIN, MAX_PIN_ATTEMPTS } from "@/lib/constants";
+import { ensureAdminFirebaseSession, clearAdminFirebaseSession } from "@/lib/admin-firebase-auth";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 
 const ATTEMPTS_KEY = "ac7_pin_attempts";
 const UNLOCK_KEY = "ac7_admin_unlocked";
 
+interface UnlockResult {
+  ok: boolean;
+  error?: string;
+  warning?: string;
+}
+
 interface AdminContextValue {
   isUnlocked: boolean;
   failedAttempts: number;
   isLocked: boolean;
-  unlock: (pin: string, expectedPin?: string) => boolean;
-  unlockWithRecovery: (code: string) => Promise<boolean>;
+  unlock: (pin: string, expectedPin?: string) => Promise<UnlockResult>;
+  unlockWithRecovery: (code: string) => Promise<UnlockResult>;
   lock: () => void;
   resetAttempts: () => void;
   requestRecovery: () => Promise<{ success: boolean; message: string }>;
 }
 
 const AdminContext = createContext<AdminContextValue | null>(null);
+
+async function activateAdminFirestoreSession(): Promise<UnlockResult> {
+  const firebaseResult = await ensureAdminFirebaseSession();
+  if (!firebaseResult.success) {
+    return {
+      ok: false,
+      error: firebaseResult.error ?? "Firebase admin login ma guulaysan",
+    };
+  }
+  return { ok: true };
+}
 
 export function AdminProvider({ children }: { children: ReactNode }) {
   const hydrated = useHydrated();
@@ -29,43 +47,75 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     const attempts = parseInt(sessionStorage.getItem(ATTEMPTS_KEY) ?? "0", 10);
     setFailedAttempts(attempts);
-    setIsUnlocked(sessionStorage.getItem(UNLOCK_KEY) === "true");
+
+    if (sessionStorage.getItem(UNLOCK_KEY) !== "true") return;
+
+    setIsUnlocked(true);
+    void activateAdminFirestoreSession().then((result) => {
+      if (!result.ok) {
+        console.warn("Admin Firebase session restore failed:", result.error);
+      }
+    });
   }, [hydrated]);
 
   const isLocked = failedAttempts >= MAX_PIN_ATTEMPTS;
 
-  const unlock = useCallback((pin: string, expectedPin: string = ADMIN_PIN): boolean => {
-    if (pin === expectedPin) {
-      setIsUnlocked(true);
-      setFailedAttempts(0);
-      sessionStorage.setItem(UNLOCK_KEY, "true");
-      sessionStorage.setItem(ATTEMPTS_KEY, "0");
-      return true;
+  const unlock = useCallback(async (pin: string, expectedPin: string = ADMIN_PIN): Promise<UnlockResult> => {
+    const normalizedPin = pin.trim();
+    const normalizedExpected = (expectedPin || ADMIN_PIN).trim();
+
+    if (normalizedPin !== normalizedExpected) {
+      const newAttempts = failedAttempts + 1;
+      sessionStorage.setItem(ATTEMPTS_KEY, String(newAttempts));
+      setFailedAttempts(newAttempts);
+      return { ok: false };
     }
 
-    const newAttempts = failedAttempts + 1;
-    sessionStorage.setItem(ATTEMPTS_KEY, String(newAttempts));
-    setFailedAttempts(newAttempts);
-    return false;
+    setIsUnlocked(true);
+    setFailedAttempts(0);
+    sessionStorage.setItem(UNLOCK_KEY, "true");
+    sessionStorage.setItem(ATTEMPTS_KEY, "0");
+
+    const firebaseResult = await activateAdminFirestoreSession();
+    if (!firebaseResult.ok) {
+      return {
+        ok: true,
+        warning:
+          firebaseResult.error ??
+          "Maamulka waa la furay. Firebase qoraalka weli ma diyaar ahayn — isku day mar kale kadib.",
+      };
+    }
+
+    return { ok: true };
   }, [failedAttempts]);
 
-  const unlockWithRecovery = useCallback(async (code: string): Promise<boolean> => {
+  const unlockWithRecovery = useCallback(async (code: string): Promise<UnlockResult> => {
     try {
       const res = await fetch("/api/recovery/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
       });
-      if (res.ok) {
-        setIsUnlocked(true);
-        setFailedAttempts(0);
-        sessionStorage.setItem(UNLOCK_KEY, "true");
-        sessionStorage.setItem(ATTEMPTS_KEY, "0");
-        return true;
+      if (!res.ok) {
+        return { ok: false };
       }
-      return false;
+
+      setIsUnlocked(true);
+      setFailedAttempts(0);
+      sessionStorage.setItem(UNLOCK_KEY, "true");
+      sessionStorage.setItem(ATTEMPTS_KEY, "0");
+
+      const firebaseResult = await activateAdminFirestoreSession();
+      if (!firebaseResult.ok) {
+        return {
+          ok: true,
+          warning: firebaseResult.error ?? "Recovery waa la aqbalay. Firebase qoraalka weli ma diyaar ahayn.",
+        };
+      }
+
+      return { ok: true };
     } catch {
-      return false;
+      return { ok: false };
     }
   }, []);
 
@@ -82,6 +132,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const lock = useCallback(() => {
     setIsUnlocked(false);
     sessionStorage.removeItem(UNLOCK_KEY);
+    void clearAdminFirebaseSession();
   }, []);
 
   const resetAttempts = useCallback(() => {

@@ -8,8 +8,26 @@ export function verifyPassword(password: string, hash: string): boolean {
   return hashPassword(password) === hash;
 }
 
+import { ADMIN_EMAIL, ADMIN_FIREBASE_EMAIL } from "./constants";
+
 export function isAdminEmail(email: string): boolean {
-  return email.toLowerCase() === "Ghaalabh10@gmail.com".toLowerCase();
+  const lower = email.trim().toLowerCase();
+  return (
+    lower === ADMIN_EMAIL.toLowerCase() ||
+    lower === ADMIN_FIREBASE_EMAIL.toLowerCase() ||
+    lower === "admin"
+  );
+}
+
+/** Login field values that should use the admin Firebase account. */
+export function isAdminLoginIdentifier(identifier: string): boolean {
+  const trimmed = identifier.trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  if (lower === "admin") return true;
+  if (lower === ADMIN_FIREBASE_EMAIL.toLowerCase()) return true;
+  if (lower === ADMIN_EMAIL.toLowerCase()) return true;
+  return false;
 }
 
 export function isValidLoginId(loginId: string): boolean {
@@ -17,9 +35,17 @@ export function isValidLoginId(loginId: string): boolean {
   return id.includes("@") && id.length >= 3 && !/\s/.test(id);
 }
 
-export function isLoginIdTaken(members: { id: string; email?: string }[], loginId: string, excludeId?: string): boolean {
+export function isLoginIdTaken(
+  members: { id: string; email?: string; loginId?: string }[],
+  loginId: string,
+  excludeId?: string
+): boolean {
   const normalized = loginId.trim().toLowerCase();
-  return members.some(
-    (m) => m.id !== excludeId && m.email?.trim().toLowerCase() === normalized
-  );
+  const localPart = normalized.split("@")[0];
+  return members.some((m) => {
+    if (m.id === excludeId) return false;
+    const memberLocal = (m.loginId ?? m.email ?? "").trim().toLowerCase().split("@")[0];
+    const memberEmail = m.email?.trim().toLowerCase();
+    return memberLocal === localPart || memberEmail === normalized;
+  });
 }

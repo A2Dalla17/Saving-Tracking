@@ -9,9 +9,16 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { verifyPassword, isAdminEmail } from "@/lib/auth";
-import { ADMIN_EMAIL } from "@/lib/constants";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { isAdminEmail, isAdminLoginIdentifier } from "@/lib/auth";
+import { resolveProfileMember } from "@/lib/resolve-profile-member";
+import {
+  normalizeLoginId,
+  resolveFirebaseLoginEmail,
+  formatFirebaseAuthError,
+  signInAdminWithFirebase,
+} from "@/lib/member-auth";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import type { AuthUser, Member } from "@/types";
 
@@ -37,73 +44,39 @@ function clearStoredUser(): void {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
+function buildAuthUserFromFirebase(
+  identifier: string,
+  uid: string,
+  email: string,
+  displayName?: string | null
+): AuthUser {
+  return {
+    memberId: uid,
+    name: displayName?.trim() || normalizeLoginId(identifier) || email.split("@")[0] || "User",
+    email,
+    isAdmin: isAdminLoginIdentifier(identifier) || isAdminEmail(email),
+  };
+}
+
+function buildAuthUser(member: Member, fallbackEmail?: string): AuthUser {
+  return {
+    memberId: member.id,
+    name: member.name,
+    email: member.email ?? fallbackEmail,
+    phone: member.phone,
+    isAdmin: isAdminEmail(member.email ?? "") || isAdminEmail(fallbackEmail ?? ""),
+  };
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (
-    identifier: string,
-    password: string,
-    members: Member[]
-  ) => Promise<{ success: boolean; error?: string }>;
+  login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  reconcileWithMembers: (members: Member[]) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function findMemberByIdentifier(members: Member[], identifier: string): Member | undefined {
-  const id = identifier.trim().toLowerCase();
-  return members.find(
-    (m) =>
-      m.email?.toLowerCase() === id ||
-      m.phone?.replace(/\s/g, "") === identifier.replace(/\s/g, "")
-  );
-}
-
-async function loginWithCloud(identifier: string, password: string) {
-  const res = await fetch("/api/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ identifier, password }),
-  });
-
-  const data = await res.json();
-  if (res.status === 503) {
-    return { success: false as const, fallbackLocal: true as const };
-  }
-  if (!res.ok) {
-    return { success: false as const, error: data.error ?? "Login failed" };
-  }
-
-  persistUser(data.user);
-  return { success: true as const, user: data.user as AuthUser };
-}
-
-function loginLocally(identifier: string, password: string, members: Member[]) {
-  const member = findMemberByIdentifier(members, identifier);
-  if (!member) return { success: false as const, error: "Login ID lama helin" };
-  if (!member.loginActive) {
-    return { success: false as const, error: "Login-kaaga weli ma active gashan. La xiriir admin-ka." };
-  }
-  if (member.status === "removed") {
-    return { success: false as const, error: "Waxaa lagaa saaray kooxda. La xiriir admin-ka." };
-  }
-  if (!member.password || !verifyPassword(password, member.password)) {
-    return { success: false as const, error: "Password-ka waa khaldan yahay" };
-  }
-
-  const authUser: AuthUser = {
-    memberId: member.id,
-    name: member.name,
-    email: member.email,
-    phone: member.phone,
-    isAdmin:
-      isAdminEmail(member.email ?? "") ||
-      member.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase(),
-  };
-
-  persistUser(authUser);
-  return { success: true as const, user: authUser };
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const hydrated = useHydrated();
@@ -119,46 +92,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loading = !hydrated || !ready;
 
-  const login = useCallback(
-    async (identifier: string, password: string, members: Member[]) => {
-      if (isSupabaseConfigured()) {
-        try {
-          const result = await loginWithCloud(identifier, password);
-          if (result.success) {
-            setUser(result.user);
-            return { success: true };
-          }
-          if ("fallbackLocal" in result && result.fallbackLocal) {
-            const local = loginLocally(identifier, password, members);
-            if (!local.success) return local;
-            setUser(local.user);
-            return { success: true };
-          }
-          return { success: false, error: result.error };
-        } catch {
-          const local = loginLocally(identifier, password, members);
-          if (!local.success) return local;
-          setUser(local.user);
-          return { success: true };
-        }
-      }
+  const login = useCallback(async (identifier: string, password: string) => {
+    const trimmedPassword = password.trim();
+    const email = resolveFirebaseLoginEmail(identifier);
+    if (!email) {
+      return { success: false, error: "auth/invalid-login-id: Login ID waa lagama maarmaan" };
+    }
 
-      const local = loginLocally(identifier, password, members);
-      if (!local.success) return local;
-      setUser(local.user);
+    const adminLogin = isAdminLoginIdentifier(identifier);
+
+    try {
+      const credential = adminLogin
+        ? await signInAdminWithFirebase(identifier, trimmedPassword)
+        : await signInWithEmailAndPassword(auth(), email, trimmedPassword);
+
+      const authUser = buildAuthUserFromFirebase(
+        identifier,
+        credential.user.uid,
+        credential.user.email ?? email,
+        credential.user.displayName
+      );
+      persistUser(authUser);
+      setUser(authUser);
       return { success: true };
-    },
-    []
-  );
+    } catch (error) {
+      return { success: false, error: formatFirebaseAuthError(error) };
+    }
+  }, []);
+
+  const reconcileWithMembers = useCallback((members: Member[]) => {
+    setUser((current) => {
+      if (!current) return current;
+      const member = resolveProfileMember(members, current);
+      if (!member || member.id === "admin-profile") return current;
+
+      const next = buildAuthUser(member, current.email ?? member.email);
+      const sameMemberId = next.memberId === current.memberId;
+      const sameName = next.name === current.name;
+      const sameEmail =
+        (next.email ?? "").trim().toLowerCase() === (current.email ?? "").trim().toLowerCase();
+      if (sameMemberId && sameName && sameEmail) return current;
+
+      persistUser(next);
+      return next;
+    });
+  }, []);
 
   const logout = useCallback(async () => {
+    try {
+      await signOut(auth());
+    } catch {
+      // ignore if not signed in to Firebase
+    }
     clearStoredUser();
     setUser(null);
     router.push("/login");
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, reconcileWithMembers }}>
       {children}
     </AuthContext.Provider>
   );

@@ -9,26 +9,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { useData } from "@/lib/hooks/use-data";
-import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { t } from "@/lib/somali";
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const { members, loading } = useData();
-  const hydrated = useHydrated();
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const showDataLoading = hydrated && loading && members.length === 0;
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     setSubmitting(true);
-    const result = await login(identifier, password, members);
+    const result = await login(identifier, password);
     if (result.success) {
       router.push("/dashboard");
     } else {
@@ -40,43 +35,55 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-md animate-fade-in-up shadow-2xl shadow-black/20">
       <CardHeader className="text-center pb-2">
-        <div className="mx-auto mb-3 relative h-16 w-16">
-          <Image src="/logo.png" alt="AC7 Group" fill className="object-contain" priority />
+        <div className="login-card-logo mx-auto mb-3 relative h-12 w-12 sm:h-14 sm:w-14">
+          <Image
+            src="/logo.png"
+            alt="AC7 Group"
+            fill
+            className="object-contain"
+            priority
+          />
         </div>
         <CardTitle className="text-2xl">{t.appName}</CardTitle>
         <CardDescription>{t.login.subtitle}</CardDescription>
       </CardHeader>
       <CardContent>
-        {showDataLoading ? (
-          <p className="text-center text-muted-foreground py-8">{t.common.loading}</p>
-        ) : (
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label>{t.login.identifier}</Label>
-              <Input
-                placeholder={t.login.identifierPlaceholder}
-                value={identifier}
-                onChange={(e) => { setIdentifier(e.target.value); setError(""); }}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t.login.password}</Label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                required
-              />
-            </div>
-            {error && <p className="text-sm text-card-foreground">{error}</p>}
-            <Button type="submit" className="w-full" variant="gold" disabled={submitting}>
-              <LogIn className="h-4 w-4" />
-              {submitting ? t.common.loading : t.login.submit}
-            </Button>
-          </form>
-        )}
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div className="space-y-2">
+            <Label>{t.login.identifier}</Label>
+            <Input
+              placeholder={t.login.identifierPlaceholder}
+              value={identifier}
+              onChange={(e) => {
+                setIdentifier(e.target.value);
+                setError("");
+              }}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t.login.password}</Label>
+            <Input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError("");
+              }}
+              required
+            />
+          </div>
+          {error && (
+            <p className="text-sm text-destructive break-words rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 font-mono">
+              {error}
+            </p>
+          )}
+          <Button type="submit" className="w-full" variant="gold" disabled={submitting}>
+            <LogIn className="h-4 w-4" />
+            {submitting ? t.common.loading : t.login.submit}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );

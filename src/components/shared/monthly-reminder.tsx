@@ -14,19 +14,21 @@ export function MonthlyReminder() {
   if (dismissed || !shouldShowMonthlyReminder(settings)) return null;
 
   return (
-    <div className="surface-light bg-card border border-border rounded-2xl p-4 flex items-start gap-3 shadow-sm text-card-foreground animate-fade-in-up">
-        <Bell className="h-5 w-5 text-card-foreground shrink-0 mt-0.5" />
-        <div className="flex-1">
-          <h3 className="font-heading font-semibold text-card-foreground">{t.reminder.title}</h3>
-          <p className="text-sm text-muted-foreground mt-1">
+    <div className="alert-box-orange relative z-10 rounded-2xl p-4 flex items-start gap-3 shadow-sm animate-fade-in-up">
+        <Bell className="h-5 w-5 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <h3 className="font-heading font-semibold">{t.reminder.title}</h3>
+          <p className="text-sm mt-1 opacity-80">
             {t.reminder.message.replace("$55", `$${settings.monthlyFee}`)}
           </p>
         </div>
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           onClick={() => setDismissed(true)}
-          className="shrink-0"
+          className="alert-box-dismiss shrink-0 touch-target"
+          aria-label={t.common.close}
         >
           <X className="h-4 w-4" />
         </Button>

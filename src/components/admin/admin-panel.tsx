@@ -129,7 +129,7 @@ export function AdminPanel() {
                 />
               </div>
               <div className="md:col-span-2 text-sm text-muted-foreground">
-                System: {getDataMode() === "supabase" ? t.settings.connected : t.settings.demo}
+                System: {getDataMode() === "firebase" ? t.settings.connected : t.settings.demo}
               </div>
             </CardContent>
           </Card>

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getPaymentsForCalendarMonth,
@@ -64,29 +63,23 @@ export function PaymentCalendar({ payments }: PaymentCalendarProps) {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
-    <Card className="animate-fade-in-up overflow-hidden">
-      <CardHeader className="bg-card border-b border-border rounded-t-2xl">
+    <Card className="calendar-accent-card animate-fade-in-up overflow-hidden">
+      <CardHeader className="calendar-card-header rounded-t-2xl">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <CardTitle className="text-card-foreground flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-card-foreground" />
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5" />
             {getMonthNameByIndex(monthIndex)} {year}
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setYear(year - 1)}>
-              {t.calendar.prevYear}
-            </Button>
-            <Button variant="outline" size="icon" onClick={goToPrevMonth}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="default" size="sm" onClick={goToToday} className="font-semibold">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="calendar-nav-btn" onClick={goToPrevMonth}>
+              {t.calendar.prevMonth}
+            </button>
+            <button type="button" className="calendar-nav-btn calendar-nav-btn-primary" onClick={goToToday}>
               {t.calendar.today}
-            </Button>
-            <Button variant="outline" size="icon" onClick={goToNextMonth}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setYear(year + 1)}>
-              {t.calendar.nextYear}
-            </Button>
+            </button>
+            <button type="button" className="calendar-nav-btn" onClick={goToNextMonth}>
+              {t.calendar.nextMonth}
+            </button>
           </div>
         </div>
         <p className="text-muted-foreground text-sm mt-1">
@@ -116,16 +109,16 @@ export function PaymentCalendar({ payments }: PaymentCalendarProps) {
                 key={day}
                 className={`calendar-day rounded-lg border p-1.5 ${
                   dayPayments.length > 0 ? "has-payment" : ""
-                } ${isToday ? "ring-2 ring-accent animate-pulse-glow" : ""}`}
+                } ${isToday ? "is-today" : ""}`}
               >
-                <div className={`text-xs font-semibold mb-1 ${isToday ? "text-card-foreground" : "text-muted-foreground"}`}>
+                <div className="calendar-day-number mb-1">
                   {day}
                 </div>
                 <div className="space-y-0.5">
                   {dayPayments.map((cp) => (
                     <div
                       key={cp.payment.id}
-                      className="text-[10px] leading-tight bg-muted text-card-foreground rounded px-1 py-0.5"
+                      className="calendar-payment-pill text-[10px] leading-tight rounded px-1 py-0.5"
                       title={`${cp.payment.memberName} — ${cp.time} — ${formatCurrency(cp.payment.amount)}`}
                     >
                       <span className="font-semibold">{cp.payment.memberName.split(" ")[0]}</span>

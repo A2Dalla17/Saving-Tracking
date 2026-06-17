@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Sidebar, MobileNav, LogoCorner } from "@/components/layout/sidebar";
+import { Sidebar, MobileNav, LogoCorner, BrandBadgeMobile } from "@/components/layout/sidebar";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useData } from "@/lib/hooks/use-data";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
@@ -12,13 +12,13 @@ function AppFrame({ children, pathname }: { children: React.ReactNode; pathname:
   return (
     <div className="min-h-screen page-gradient safe-top">
       <Sidebar />
-      <LogoCorner />
-      <main className="app-main-layer lg:pl-72 surface-dark">
-        <div key={pathname} className="w-full px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6">
+      <main className="app-main-layer app-content-layer lg:pl-72">
+        <div key={pathname} className="app-page-shell w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6">
           {children}
         </div>
       </main>
       <MobileNav />
+      <BrandBadgeMobile />
     </div>
   );
 }
@@ -26,7 +26,7 @@ function AppFrame({ children, pathname }: { children: React.ReactNode; pathname:
 function LoginShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen page-gradient flex items-center justify-center p-4 sm:p-6 safe-top pb-safe">
-      <LogoCorner showOnMobile />
+      <LogoCorner showOnMobile compact />
       {children}
     </div>
   );

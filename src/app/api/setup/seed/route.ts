@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { seedSupabaseIfEmpty } from "@/lib/supabase-seed";
+import { seedFirestoreIfEmpty } from "@/lib/firestore-seed";
 
 export async function POST() {
   try {
-    const result = await seedSupabaseIfEmpty();
+    const result = await seedFirestoreIfEmpty();
     if (result.reason === "admin-missing") {
       return NextResponse.json(
-        { error: "SUPABASE_SERVICE_ROLE_KEY ma jiro Vercel-ka" },
+        { error: "Firebase admin credentials ma jiraan Vercel-ka" },
         { status: 503 }
       );
     }

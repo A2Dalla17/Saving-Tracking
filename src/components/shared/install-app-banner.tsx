@@ -60,7 +60,7 @@ export function InstallAppBanner() {
   if (dismissed || (!deferredPrompt && !showIosHint)) return null;
 
   return (
-    <div className="rounded-2xl border border-border surface-light bg-card p-4 sm:p-5 shadow-lg animate-fade-in-up">
+    <div className="rounded-2xl border border-border bg-white p-4 sm:p-5 shadow-md animate-fade-in-up">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl surface-dark brand-gradient text-white">
           <Download className="h-5 w-5" />

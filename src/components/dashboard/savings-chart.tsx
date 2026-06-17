@@ -30,26 +30,26 @@ export function SavingsChart({ data }: SavingsChartProps) {
             <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#243041" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#243041" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#0f2744" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#0f2744" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(36,48,65,0.08)" />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 12, fill: "#243041" }}
+                tick={{ fontSize: 12, fill: "#0f2744" }}
                 axisLine={{ stroke: "rgba(36,48,65,0.15)" }}
               />
               <YAxis
-                tick={{ fontSize: 12, fill: "#243041" }}
+                tick={{ fontSize: 12, fill: "#0f2744" }}
                 axisLine={{ stroke: "rgba(36,48,65,0.15)" }}
                 tickFormatter={(v) => `$${v}`}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#eceff3",
-                  border: "1px solid rgba(36,48,65,0.12)",
-                  color: "#243041",
+                  backgroundColor: "#ffffff",
+                  border: "1px solid rgba(15,39,68,0.12)",
+                  color: "#0f2744",
                   borderRadius: "12px",
                   fontFamily: "Roboto, Segoe UI, sans-serif",
                 }}
@@ -58,7 +58,7 @@ export function SavingsChart({ data }: SavingsChartProps) {
               <Area
                 type="monotone"
                 dataKey="savings"
-                stroke="#243041"
+                stroke="#0f2744"
                 strokeWidth={3}
                 fill="url(#savingsGradient)"
               />

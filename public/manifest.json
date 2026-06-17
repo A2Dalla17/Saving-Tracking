@@ -3,7 +3,7 @@
   "name": "AC7 Group — Aragti Cad",
   "short_name": "AC7 Group",
   "description": "Kaydka kooxda AC7 — App & Website",
-  "start_url": "/login",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "browser"],

@@ -7,42 +7,94 @@ import type {
   Payment,
   Savings,
 } from "@/types";
+import { loginIdToEmail, normalizeLoginId } from "@/lib/member-auth";
 
 export function rowToMember(row: Record<string, unknown>): Member {
+  const loginId =
+    (row.loginId as string) ||
+    (row.login_id as string) ||
+    undefined;
+  const email =
+    (row.email as string) ||
+    (loginId ? loginIdToEmail(loginId) : undefined) ||
+    undefined;
+  const contribution =
+    row.contributionAmount != null
+      ? Number(row.contributionAmount)
+      : row.contribution != null
+        ? Number(row.contribution)
+        : row.monthly_fee != null
+          ? Number(row.monthly_fee)
+          : undefined;
+
+  const createdAtRaw = row.createdAt ?? row.created_at;
+
   return {
-    id: row.id as string,
+    id: (row.uid as string) || (row.id as string),
+    uid: (row.uid as string) || undefined,
     name: row.name as string,
     phone: (row.phone as string) || undefined,
-    email: (row.email as string) || undefined,
+    email,
+    loginId: loginId ? normalizeLoginId(loginId) : email ? normalizeLoginId(email) : undefined,
+    paid: typeof row.paid === "boolean" ? row.paid : false,
     password: (row.password as string) || undefined,
-    joinDate: row.join_date as string,
+    joinDate: (row.join_date as string) || new Date().toISOString().slice(0, 10),
     endDate: (row.end_date as string) || undefined,
-    monthlyFee: row.monthly_fee != null ? Number(row.monthly_fee) : undefined,
-    annualTarget: row.annual_target != null ? Number(row.annual_target) : undefined,
-    loginActive: Boolean(row.login_active),
+    monthlyFee: contribution,
+    annualTarget: row.annual_target != null ? Number(row.annual_target) : contribution != null ? contribution * 12 : undefined,
+    loginActive: row.login_active != null ? Boolean(row.login_active) : true,
     status: (row.status as Member["status"]) ?? "active",
     avatarUrl: (row.avatar_url as string) || undefined,
-    createdAt: row.created_at
-      ? new Date(row.created_at as string).toISOString()
+    createdAt: createdAtRaw
+      ? new Date(createdAtRaw as string).toISOString()
       : new Date().toISOString(),
   };
 }
 
 export function memberToRow(member: Partial<Member> & { id: string; name: string }) {
+  const loginId = member.loginId ?? (member.email ? normalizeLoginId(member.email) : "");
+  const contribution = member.monthlyFee ?? null;
+  const createdAt = member.createdAt ?? new Date().toISOString();
+
   return {
-    id: member.id,
     name: member.name,
+    uid: member.uid ?? member.id,
+    loginId,
+    login_id: loginId,
+    contributionAmount: contribution,
+    contribution,
+    paid: member.paid ?? false,
+    createdAt,
+    created_at: createdAt,
     phone: member.phone ?? "",
-    email: member.email ?? "",
+    email: member.email ?? (loginId ? loginIdToEmail(loginId) : ""),
     password: member.password ?? null,
     join_date: member.joinDate,
     end_date: member.endDate ?? null,
-    monthly_fee: member.monthlyFee ?? null,
-    annual_target: member.annualTarget ?? null,
+    monthly_fee: contribution,
+    annual_target: member.annualTarget ?? (contribution != null ? contribution * 12 : null),
     login_active: member.loginActive ?? false,
     status: member.status ?? "active",
     avatar_url: member.avatarUrl ?? null,
-    created_at: member.createdAt ?? new Date().toISOString(),
+  };
+}
+
+export function newMemberToFirestore(input: {
+  name: string;
+  loginId: string;
+  contribution: number;
+  uid: string;
+  joinDate: string;
+  createdAt: string;
+}) {
+  const loginId = normalizeLoginId(input.loginId);
+  return {
+    name: input.name,
+    loginId,
+    contributionAmount: input.contribution,
+    paid: false,
+    uid: input.uid,
+    createdAt: input.createdAt,
   };
 }
 
@@ -166,6 +218,7 @@ export function rowToChat(row: Record<string, unknown>): ChatMessage {
     fromAdmin: Boolean(row.from_admin),
     message: row.message as string,
     sentAt: new Date(row.sent_at as string).toISOString(),
+    senderName: (row.sender_name as string) || undefined,
   };
 }
 
@@ -176,6 +229,7 @@ export function chatToRow(item: ChatMessage) {
     from_admin: item.fromAdmin,
     message: item.message,
     sent_at: item.sentAt,
+    sender_name: item.senderName ?? null,
   };
 }
 

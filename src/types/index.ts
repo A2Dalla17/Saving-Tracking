@@ -5,6 +5,9 @@ export interface Member {
   name: string;
   phone?: string;
   email?: string;
+  loginId?: string;
+  uid?: string;
+  paid?: boolean;
   password?: string;
   joinDate: string;
   endDate?: string;
@@ -62,6 +65,7 @@ export interface ChatMessage {
   fromAdmin: boolean;
   message: string;
   sentAt: string;
+  senderName?: string;
 }
 
 export interface ArchivedMemberRecord {

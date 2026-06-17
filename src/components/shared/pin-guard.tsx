@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAdmin } from "@/lib/hooks/use-admin";
 import { useData } from "@/lib/hooks/use-data";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
-import { ADMIN_EMAIL, MAX_PIN_ATTEMPTS } from "@/lib/constants";
+import { ADMIN_EMAIL, ADMIN_PIN, MAX_PIN_ATTEMPTS } from "@/lib/constants";
 import { t } from "@/lib/somali";
 
 interface PinGuardProps {
@@ -51,22 +51,33 @@ export function PinGuard({ children, description }: PinGuardProps) {
 
   if (isUnlocked) return <>{children}</>;
 
-  const handleUnlock = () => {
-    if (!pin) {
+  const handleUnlock = async () => {
+    if (!pin.trim()) {
       setError(t.ledger.pinRequired);
       return;
     }
-    const success = unlock(pin, settings.adminPin);
-    if (!success) {
-      const remaining = MAX_PIN_ATTEMPTS - failedAttempts - 1;
-      if (remaining <= 0) {
-        setError(t.recovery.lockedOut);
-        setShowRecovery(true);
-      } else {
-        setError(`${t.ledger.pinIncorrect} (${remaining} isku day oo haray)`);
+    const expectedPin = settings.adminPin?.trim() || ADMIN_PIN;
+    const result = await unlock(pin.trim(), expectedPin);
+    if (result.ok) {
+      if (result.warning) {
+        toast.warning(result.warning);
       }
-      setPin("");
+      return;
     }
+    if (result.error) {
+      setError(result.error);
+      setPin("");
+      return;
+    }
+    const attemptsAfterFail = failedAttempts + 1;
+    const remaining = MAX_PIN_ATTEMPTS - attemptsAfterFail;
+    if (remaining <= 0) {
+      setError(t.recovery.lockedOut);
+      setShowRecovery(true);
+    } else {
+      setError(`${t.ledger.pinIncorrect} (${remaining} isku day oo haray)`);
+    }
+    setPin("");
   };
 
   const handleSendRecovery = async () => {
@@ -84,12 +95,15 @@ export function PinGuard({ children, description }: PinGuardProps) {
   const handleVerifyRecovery = async () => {
     if (!recoveryCode) return;
     setVerifyingRecovery(true);
-    const success = await unlockWithRecovery(recoveryCode);
+    const result = await unlockWithRecovery(recoveryCode);
     setVerifyingRecovery(false);
-    if (success) {
+    if (result.ok) {
       toast.success(t.recovery.success);
+      if (result.warning) {
+        toast.warning(result.warning);
+      }
     } else {
-      setError(t.recovery.invalidCode);
+      setError(result.error ?? t.recovery.invalidCode);
     }
   };
 

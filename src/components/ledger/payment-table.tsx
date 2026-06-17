@@ -75,7 +75,7 @@ export function PaymentTable() {
     );
   }
 
-  const allPaid = memberStatsList.every((ms) => ms.isCurrentMonthPaid);
+  const allPaid = memberStatsList.every((ms) => ms.isCurrentMonthPaid || ms.member.paid);
 
   return (
     <Card className="animate-fade-in-up">
@@ -97,16 +97,18 @@ export function PaymentTable() {
               </tr>
             </thead>
             <tbody>
-              {memberStatsList.map((ms) => (
+              {memberStatsList.map((ms) => {
+                const isPaid = ms.isCurrentMonthPaid || ms.member.paid;
+                return (
                 <tr key={ms.member.id} className="border-b border-border hover:bg-muted transition-colors">
                   <td className="py-4 px-4">
                     <span className="font-medium text-card-foreground">{ms.member.name}</span>
-                    {ms.consecutiveMissed > 0 && !ms.isCurrentMonthPaid && (
+                    {ms.consecutiveMissed > 0 && !isPaid && (
                       <span className="block text-xs text-card-foreground">{t.ledger.escalated}</span>
                     )}
                   </td>
                   <td className="py-4 px-4">
-                    {ms.isCurrentMonthPaid ? (
+                    {isPaid ? (
                       <span className="inline-flex items-center gap-1.5 text-sm text-card-foreground">
                         <CheckCircle2 className="h-4 w-4" />
                         {t.members.paid}
@@ -119,7 +121,7 @@ export function PaymentTable() {
                     )}
                   </td>
                   <td className="py-4 px-4">
-                    {ms.isCurrentMonthPaid ? (
+                    {isPaid ? (
                       <CurrencyDisplay amount={ms.currentMonthDue} size="sm" />
                     ) : (
                       <div className="space-y-1">
@@ -146,7 +148,7 @@ export function PaymentTable() {
                     )}
                   </td>
                   <td className="py-4 px-4 text-right">
-                    {ms.isCurrentMonthPaid ? (
+                    {isPaid ? (
                       <Button
                         size="sm"
                         variant="outline"
@@ -168,7 +170,8 @@ export function PaymentTable() {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

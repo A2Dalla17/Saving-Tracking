@@ -17,6 +17,7 @@ import {
   subscribeChats,
   subscribeBin,
   addMember,
+  addMemberWithAuth,
   updateMember,
   deleteMember,
   archiveMemberToBin,
@@ -45,6 +46,12 @@ interface DataContextValue {
   bin: ArchivedMemberRecord[];
   loading: boolean;
   createMember: (data: Omit<Member, "id" | "createdAt">) => Promise<Member>;
+  createMemberWithAuth: (data: {
+    name: string;
+    loginId: string;
+    password: string;
+    contribution: number;
+  }) => Promise<Member>;
   editMember: (id: string, data: Partial<Member>) => Promise<void>;
   removeMember: (id: string) => Promise<void>;
   restoreFromBin: (archiveId: string) => Promise<void>;
@@ -52,7 +59,7 @@ interface DataContextValue {
   removePayment: (id: string) => Promise<void>;
   updateSettings: (settings: AppSettings) => Promise<void>;
   postAnnouncement: (message: string, durationHours: number) => Promise<void>;
-  sendChat: (memberId: string, message: string, fromAdmin: boolean) => Promise<void>;
+  sendChat: (memberId: string, message: string, fromAdmin: boolean, senderName?: string) => Promise<void>;
   removeChat: (chatId: string) => Promise<void>;
 }
 
@@ -62,7 +69,7 @@ const LOAD_TIMEOUT_MS = 5000;
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const hydrated = useHydrated();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, reconcileWithMembers } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -117,6 +124,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       unsubMembers = subscribeMembers((data) => {
         setMembers(data);
         setDataReady(true);
+      });
+      unsubPayments = subscribePayments((data) => {
+        setPayments(data);
       });
     };
 
@@ -193,12 +203,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [hydrated, user, authLoading]);
 
   useEffect(() => {
-    if (!loading && members.length > 0 && user) {
+    if (!loading && members.length > 0 && user?.isAdmin) {
       syncMemberStatuses(members, payments, settings);
     }
   }, [members, payments, settings, loading, user, syncMemberStatuses]);
 
+  useEffect(() => {
+    if (members.length === 0 || !user) return;
+    reconcileWithMembers(members);
+  }, [members, user, reconcileWithMembers]);
+
   const createMember = useCallback(async (data: Omit<Member, "id" | "createdAt">) => addMember(data), []);
+  const createMemberWithAuth = useCallback(
+    async (data: { name: string; loginId: string; password: string; contribution: number }) =>
+      addMemberWithAuth(data),
+    []
+  );
   const editMember = useCallback(async (id: string, data: Partial<Member>) => updateMember(id, data), []);
   const removeMember = useCallback(async (id: string) => deleteMember(id), []);
   const restoreFromBin = useCallback(async (archiveId: string) => restoreMemberFromBin(archiveId), []);
@@ -211,9 +231,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const postAnnouncement = useCallback(async (message: string, durationHours: number) => {
     await addAnnouncement(message, durationHours);
   }, []);
-  const sendChat = useCallback(async (memberId: string, message: string, fromAdmin: boolean) => {
-    await addChatMessage(memberId, message, fromAdmin);
-  }, []);
+  const sendChat = useCallback(
+    async (memberId: string, message: string, fromAdmin: boolean, senderName?: string) => {
+      await addChatMessage(memberId, message, fromAdmin, senderName);
+    },
+    []
+  );
   const removeChat = useCallback(async (chatId: string) => deleteChatMessage(chatId), []);
 
   return (
@@ -227,6 +250,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         bin,
         loading,
         createMember,
+        createMemberWithAuth,
         editMember,
         removeMember,
         restoreFromBin,
