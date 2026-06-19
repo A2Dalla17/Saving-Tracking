@@ -205,26 +205,8 @@ function getSecondaryAuth() {
   return getAuth(app);
 }
 
-export async function createMemberFirebaseAuth(loginId: string, password: string): Promise<string> {
-  const email = loginIdToEmail(loginId);
-  const secondaryAuth = getSecondaryAuth();
-
-  try {
-    const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-    return credential.user.uid;
-  } catch (error: unknown) {
-    const code = (error as { code?: string })?.code;
-    if (code === "auth/email-already-in-use") {
-      throw new Error("Login ID-kan horey ayaa loo isticmaalay");
-    }
-    if (code === "auth/weak-password") {
-      throw new Error("Password-ku aad buu u fudud yahay");
-    }
-    if (code === "auth/invalid-email") {
-      throw new Error("Login ID aan sax ahayn");
-    }
-    throw error;
-  } finally {
-    await signOut(secondaryAuth);
-  }
+export async function createMemberFirebaseAuth(_loginId: string, _password: string): Promise<string> {
+  throw new Error(
+    "Firebase Auth client-side lama abuuro — isticmaal Admin → Ku dar xubin (hal mar Auth + Firestore)"
+  );
 }

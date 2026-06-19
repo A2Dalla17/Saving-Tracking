@@ -31,6 +31,7 @@ import {
   seedDefaultMembers,
   setMemberPaid,
   fetchMembersFromServerApi,
+  syncMembersFromServerApi,
 } from "@/lib/data-store";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
@@ -103,10 +104,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const refreshMembersFromServer = useCallback(async () => {
     try {
-      const server = await fetchMembersFromServerApi();
+      const server = await syncMembersFromServerApi().catch(() => fetchMembersFromServerApi());
       serverMembersRef.current = server;
       publishMembers();
-      console.log("Admin members loaded from server:", server.length);
+      console.log("Admin members loaded (Auth + Firestore):", server.length);
     } catch (err) {
       console.error("Server members fetch failed:", err);
     }

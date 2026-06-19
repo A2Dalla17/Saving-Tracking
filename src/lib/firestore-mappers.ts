@@ -29,10 +29,11 @@ export function rowToMember(row: Record<string, unknown>): Member {
           : undefined;
 
   const createdAtRaw = row.createdAt ?? row.created_at;
+  const uid = (row.uid as string) || docId || undefined;
 
   return {
     id: docId,
-    uid: (row.uid as string) || undefined,
+    uid,
     name: row.name as string,
     phone: (row.phone as string) || undefined,
     email,

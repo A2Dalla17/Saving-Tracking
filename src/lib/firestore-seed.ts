@@ -1,42 +1,38 @@
 import { hashPassword } from "@/lib/auth";
 import {
   ADMIN_EMAIL,
-  ADMIN_PASSWORD,
   ADMIN_FIREBASE_EMAIL,
   ADMIN_FIREBASE_PASSWORD,
-  DEFAULT_MEMBER_PASSWORD,
-  DEFAULT_MEMBER_PROFILES,
   DEFAULT_SETTINGS,
 } from "@/lib/constants";
 import { getFirestoreAdmin, getFirebaseAdminAuth } from "@/lib/firebase-admin";
-import {
-  memberToRow,
-  paymentToRow,
-  announcementToRow,
-  chatToRow,
-  settingsToRow,
-  savingsToRow,
-  paymentToSavings,
-} from "@/lib/firestore-mappers";
+import { memberToRow, settingsToRow, paymentToRow, announcementToRow, chatToRow, savingsToRow, paymentToSavings } from "@/lib/firestore-mappers";
 import type { Announcement, AppSettings, ChatMessage, Member, Payment } from "@/types";
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-async function ensureAdminFirebaseAuthUser(): Promise<void> {
+async function ensureAdminFirebaseAuthUser(): Promise<string | null> {
   const auth = getFirebaseAdminAuth();
-  if (!auth) return;
+  if (!auth) return null;
 
   try {
-    await auth.getUserByEmail(ADMIN_FIREBASE_EMAIL);
+    const existing = await auth.getUserByEmail(ADMIN_FIREBASE_EMAIL);
+    await auth.updateUser(existing.uid, {
+      password: ADMIN_FIREBASE_PASSWORD,
+      emailVerified: true,
+      displayName: "AC7 Admin",
+    });
+    return existing.uid;
   } catch {
-    await auth.createUser({
+    const created = await auth.createUser({
       email: ADMIN_FIREBASE_EMAIL,
       password: ADMIN_FIREBASE_PASSWORD,
       emailVerified: true,
       displayName: "AC7 Admin",
     });
+    return created.uid;
   }
 }
 
@@ -47,6 +43,7 @@ export async function isFirestoreEmpty(): Promise<boolean> {
   return snap.empty;
 }
 
+/** Seed only admin + settings — members are created via Admin page (Auth + Firestore unified). */
 export async function seedFirestoreIfEmpty(): Promise<{ seeded: boolean; reason?: string }> {
   const db = getFirestoreAdmin();
   if (!db) return { seeded: false, reason: "admin-missing" };
@@ -54,37 +51,21 @@ export async function seedFirestoreIfEmpty(): Promise<{ seeded: boolean; reason?
   const existing = await db.collection("members").limit(1).get();
   if (!existing.empty) return { seeded: false };
 
-  await ensureAdminFirebaseAuthUser();
+  const adminUid = await ensureAdminFirebaseAuthUser();
+  if (!adminUid) return { seeded: false, reason: "admin-auth-missing" };
 
   const now = new Date().toISOString();
   const batch = db.batch();
 
-  for (const profile of DEFAULT_MEMBER_PROFILES) {
-    const id = generateId();
-    batch.set(db.collection("members").doc(id), memberToRow({
-      id,
-      name: profile.name,
-      email: profile.email,
-      phone: "",
-      password: hashPassword(DEFAULT_MEMBER_PASSWORD),
-      joinDate: DEFAULT_SETTINGS.groupStartDate,
-      monthlyFee: profile.monthlyFee,
-      annualTarget: profile.annualTarget,
-      loginActive: false,
-      status: "active",
-      createdAt: now,
-    }));
-  }
-
-  const adminId = generateId();
   batch.set(
-    db.collection("members").doc(adminId),
+    db.collection("members").doc(adminUid),
     memberToRow({
-      id: adminId,
+      id: adminUid,
+      uid: adminUid,
       name: "Maamulaha",
       email: ADMIN_EMAIL,
       phone: "",
-      password: hashPassword(ADMIN_PASSWORD),
+      password: hashPassword(ADMIN_FIREBASE_PASSWORD),
       joinDate: DEFAULT_SETTINGS.groupStartDate,
       monthlyFee: 0,
       annualTarget: 0,

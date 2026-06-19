@@ -149,6 +149,27 @@ async function createMemberViaServerApi(input: {
   return { id: uid, uid };
 }
 
+/** Sync Firebase Auth → Firestore then return unified member list. */
+export async function syncMembersFromServerApi(): Promise<Member[]> {
+  const res = await fetch("/api/members/sync", { method: "POST", cache: "no-store" });
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    members?: Array<Partial<Member> & { id: string; name: string }>;
+    sync?: { created: number; migrated: number; linked: number };
+    error?: string;
+  };
+
+  if (!res.ok) {
+    throw new Error(data.error ?? `Server error ${res.status}`);
+  }
+
+  const rows = data.members ?? [];
+  console.log("Members synced from Firebase Auth:", data.sync);
+  return rows
+    .map((row) => normalizeMember(rowToMember(row as Record<string, unknown>)))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
 /** Load all members via Admin SDK API (works when client Firestore read is blocked). */
 export async function fetchMembersFromServerApi(): Promise<Member[]> {
   const res = await fetch("/api/members/list", { cache: "no-store" });
@@ -377,26 +398,8 @@ export async function seedDefaultMembers(): Promise<void> {
     // non-blocking
   }
 
-  try {
-    const hasMembers = await collectionHasDocuments("members");
-    if (hasMembers) return;
-  } catch (err) {
-    console.error("FIRESTORE members count error:", err);
-    return;
-  }
-
-  // Only ensure admin exists when DB is empty — no hardcoded member list on client.
-  await addMember({
-    name: "Maamulaha",
-    email: ADMIN_EMAIL,
-    joinDate: DEFAULT_SETTINGS.groupStartDate,
-    monthlyFee: 0,
-    annualTarget: 0,
-    loginActive: true,
-    status: "active",
-    paid: false,
-    password: hashPassword(ADMIN_PASSWORD),
-  });
+  // Only server seed — members are added via Admin (Auth + Firestore unified).
+  await ensureAdminMember();
 }
 
 function safeFirestoreSubscribe(
@@ -615,9 +618,13 @@ export async function addMemberWithAuth(input: AddMemberWithAuthInput): Promise<
   });
 }
 
-function isLoginIdTakenLocal(members: Member[], loginId: string): boolean {
+function isLoginIdTakenLocal(members: Member[], loginId: string, excludeId?: string): boolean {
   const local = normalizeLoginId(loginId).toLowerCase();
-  return members.some((m) => (m.loginId ?? normalizeLoginId(m.email ?? "")).toLowerCase() === local);
+  return members.some((m) => {
+    if (excludeId && m.id === excludeId) return false;
+    const key = (m.loginId ?? normalizeLoginId(m.email ?? "")).toLowerCase();
+    return key === local;
+  });
 }
 
 export async function addMember(member: Omit<Member, "id" | "createdAt">): Promise<Member> {
@@ -756,13 +763,19 @@ export async function archiveMemberToBin(
   });
   await batch.commit();
 
-  if (member.uid) {
+  const authUid = member.uid || memberId;
+  const loginId = member.loginId ?? normalizeLoginId(member.email ?? "");
+  if (authUid || member.email || loginId) {
     try {
-      await fetch("/api/members/delete", {
+      const res = await fetch("/api/members/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: member.uid, email: member.email }),
+        body: JSON.stringify({ uid: authUid, email: member.email, loginId }),
       });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        console.warn("Auth/Firestore delete warning:", data.error ?? res.status);
+      }
     } catch (err) {
       console.warn("Auth user delete skipped:", err);
     }
