@@ -11,7 +11,4 @@ export const firebasePublicConfig = {
 export const FIREBASE_API_KEY = firebasePublicConfig.apiKey;
 
 /** Firestore database id — project uses "default" (not "(default)"). */
-export const firestoreDatabaseId =
-  (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID?.trim() : undefined) ||
-  (typeof process !== "undefined" ? process.env.FIRESTORE_DATABASE_ID?.trim() : undefined) ||
-  "default";
+export const firestoreDatabaseId = "default";

@@ -95,7 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
 
-    const unsubscribe = onAuthStateChanged(auth(), (firebaseUser) => {
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = onAuthStateChanged(auth(), (firebaseUser) => {
       if (!firebaseUser) return;
 
       setUser((current) => {
@@ -128,9 +130,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return next;
       });
-    });
+      });
+    } catch (err) {
+      console.error("Firebase Auth listener failed:", err);
+      return;
+    }
 
-    return () => unsubscribe();
+    return () => unsubscribe?.();
   }, [hydrated]);
 
   const loading = !hydrated || !ready;

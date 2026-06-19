@@ -399,6 +399,20 @@ export async function seedDefaultMembers(): Promise<void> {
   });
 }
 
+function safeFirestoreSubscribe(
+  label: string,
+  setup: () => Unsubscribe,
+  onFail: () => void
+): Unsubscribe {
+  try {
+    return setup();
+  } catch (err) {
+    console.error(`FIRESTORE ${label} subscribe setup error:`, err);
+    onFail();
+    return () => undefined;
+  }
+}
+
 export function subscribeMembers(callback: (members: Member[]) => void): Unsubscribe {
   if (!isFirebaseConfigured()) {
     callback([]);
@@ -406,26 +420,30 @@ export function subscribeMembers(callback: (members: Member[]) => void): Unsubsc
   }
 
   void ensureFirestoreOnline();
-
-  return onSnapshot(
-    collection(db(), "members"),
-    (snapshot) => {
-      console.log("Firestore members snapshot:", snapshot.docs.length, "documents");
-      const members = snapshot.docs
-        .map((snap) => normalizeMember(rowToMember({ id: snap.id, ...snap.data() })))
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      callback(members);
-    },
-    (err) => {
-      const code = (err as { code?: string })?.code;
-      console.error("FIRESTORE members fetch error:", err);
-      if (code === "permission-denied") {
-        console.error(
-          "Firestore RULES blocked read. Update Firebase Console → Firestore → Rules to: allow read, write: if request.auth != null"
-        );
-      }
-      callback([]);
-    }
+  return safeFirestoreSubscribe(
+    "members",
+    () =>
+      onSnapshot(
+        collection(db(), "members"),
+        (snapshot) => {
+          console.log("Firestore members snapshot:", snapshot.docs.length, "documents");
+          const members = snapshot.docs
+            .map((snap) => normalizeMember(rowToMember({ id: snap.id, ...snap.data() })))
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          callback(members);
+        },
+        (err) => {
+          const code = (err as { code?: string })?.code;
+          console.error("FIRESTORE members fetch error:", err);
+          if (code === "permission-denied") {
+            console.error(
+              "Firestore RULES blocked read. Update Firebase Console → Firestore → Rules to: allow read, write: if request.auth != null"
+            );
+          }
+          callback([]);
+        }
+      ),
+    () => callback([])
   );
 }
 
@@ -435,18 +453,23 @@ export function subscribePayments(callback: (payments: Payment[]) => void): Unsu
     return () => undefined;
   }
 
-  return onSnapshot(
-    collection(db(), "payments"),
-    (snapshot) => {
-      const payments = mapCollectionSnapshot(snapshot, rowToPayment).sort(
-        (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
-      );
-      callback(payments);
-    },
-    (err) => {
-      console.error("FIRESTORE payments fetch error:", err);
-      callback([]);
-    }
+  return safeFirestoreSubscribe(
+    "payments",
+    () =>
+      onSnapshot(
+        collection(db(), "payments"),
+        (snapshot) => {
+          const payments = mapCollectionSnapshot(snapshot, rowToPayment).sort(
+            (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
+          );
+          callback(payments);
+        },
+        (err) => {
+          console.error("FIRESTORE payments fetch error:", err);
+          callback([]);
+        }
+      ),
+    () => callback([])
   );
 }
 
@@ -474,19 +497,24 @@ export function subscribeSettings(callback: (settings: AppSettings) => void): Un
     return () => undefined;
   }
 
-  return onSnapshot(
-    doc(db(), "app_settings", "app"),
-    (snapshot) => {
-      callback(
-        snapshot.exists()
-          ? rowToSettings({ id: snapshot.id, ...snapshot.data() })
-          : DEFAULT_SETTINGS
-      );
-    },
-    (err) => {
-      console.error("FIRESTORE settings fetch error:", err);
-      callback(DEFAULT_SETTINGS);
-    }
+  return safeFirestoreSubscribe(
+    "settings",
+    () =>
+      onSnapshot(
+        doc(db(), "app_settings", "app"),
+        (snapshot) => {
+          callback(
+            snapshot.exists()
+              ? rowToSettings({ id: snapshot.id, ...snapshot.data() })
+              : DEFAULT_SETTINGS
+          );
+        },
+        (err) => {
+          console.error("FIRESTORE settings fetch error:", err);
+          callback(DEFAULT_SETTINGS);
+        }
+      ),
+    () => callback(DEFAULT_SETTINGS)
   );
 }
 

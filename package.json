@@ -9,7 +9,7 @@
     "dev": "next dev -p 3000",
     "dev:clean": "node scripts/clean-dev.mjs && next dev -p 3000",
     "dev:win": "node scripts/ensure-lightningcss.mjs && node scripts/kill-dev-port.mjs && node scripts/clean-dev.mjs && node scripts/ensure-next-cache.mjs && next dev -p 3000",
-    "build": "next build",
+    "build": "node scripts/prebuild.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "firebase:status": "node scripts/check-firebase.mjs",
